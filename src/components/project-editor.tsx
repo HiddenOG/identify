@@ -7,6 +7,7 @@ import { Markdown } from "@/components/markdown";
 import { importGithubRepo } from "@/lib/import/github-action";
 import { saveProject, type SaveProjectState } from "@/lib/project-actions";
 import type { ProjectRow } from "@/lib/projects";
+import { LogoMark } from "@/components/logo";
 import { SITE_NAME } from "@/lib/site";
 import { createClient } from "@/lib/supabase/client";
 
@@ -109,8 +110,8 @@ export function ProjectEditor({ userId, project }: { userId: string; project?: P
       {/* Slim top bar; it sits over the site header, so there's no search here. Publish is at the bottom. */}
       <div className="fixed inset-x-0 top-0 z-50 h-14 border-b border-line bg-background">
         <div className="mx-auto flex h-full max-w-5xl items-center gap-4 px-4">
-          <Link href="/" className="font-serif text-2xl font-bold tracking-tight">
-            {SITE_NAME}
+          <Link href="/" aria-label={`${SITE_NAME} home`} className="shrink-0">
+            <LogoMark size={26} />
           </Link>
           <span className="text-sm">{published ? "Published" : "Draft"}</span>
           {saveStatus && <span className="hidden text-sm text-muted sm:inline">{saveStatus}</span>}

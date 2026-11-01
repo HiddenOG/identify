@@ -2,6 +2,7 @@ import { Suspense } from "react";
 import Link from "next/link";
 import { HeaderSearch } from "@/components/header-search";
 import { MessageIcon, WriteIcon } from "@/components/icons";
+import { Logo } from "@/components/logo";
 import { NotificationsMenu } from "@/components/notifications-menu";
 import { AuthMark, SidebarToggle } from "@/components/sidebar";
 import { UserMenu } from "@/components/user-menu";
@@ -20,8 +21,8 @@ export function SiteHeader() {
       <div className="flex h-14 items-center justify-between gap-4 px-4 sm:px-6 signed-out:mx-auto signed-out:max-w-6xl">
         <div className="flex min-w-0 items-center gap-3 sm:gap-4">
           <SidebarToggle />
-          <Link href="/" className="font-serif text-[1.65rem] font-bold tracking-tight">
-            {SITE_NAME}
+          <Link href="/" aria-label={`${SITE_NAME} home`} className="shrink-0">
+            <Logo />
           </Link>
           <HeaderSearch />
         </div>
