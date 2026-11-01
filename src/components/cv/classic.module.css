@@ -1,0 +1,504 @@
+/* Template #1 "classic" — ported from the original static portfolio.
+   Colors and font come from --cv-* variables set inline by the component. */
+
+.root {
+  --first-color: var(--cv-accent);
+  --first-color-alt: color-mix(in srgb, var(--cv-accent) 88%, black);
+  --title-color: var(--cv-ink);
+  --black-color: var(--cv-ink);
+  --body-color: var(--cv-paper);
+
+  --biggest-font-size: 3rem;
+  --h1-font-size: 1.5rem;
+  --normal-font-size: 0.938rem;
+  --small-font-size: 0.813rem;
+
+  font-family: var(--cv-font);
+  font-size: var(--normal-font-size);
+  background-color: var(--body-color);
+  color: var(--title-color);
+  overflow: hidden;
+}
+
+.root * {
+  box-sizing: border-box;
+}
+
+.root h1,
+.root h2,
+.root h3 {
+  color: var(--title-color);
+  font-weight: 600;
+  margin: 0;
+}
+
+.root p,
+.root ul {
+  margin: 0;
+}
+
+.root a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.content {
+  animation: enter 0.8s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+.container {
+  max-width: 1120px;
+  margin-inline: 1rem;
+}
+
+.section {
+  padding-block: 2rem;
+}
+
+.sectionTitle {
+  width: max-content;
+  max-width: 100%;
+  font-size: var(--normal-font-size);
+  font-weight: 500 !important;
+  margin-bottom: 1.25rem !important;
+  padding: 0.25rem 1rem;
+  background-color: var(--first-color);
+}
+
+/* ============ PROFILE ============ */
+.profile {
+  display: grid;
+  gap: 1.5rem;
+  padding-top: 1.5rem;
+}
+
+.imageFrame {
+  width: 240px;
+  height: 340px;
+  border: 3px dashed var(--black-color);
+  transform: rotate(5deg);
+  margin: 0 auto 2rem;
+  display: grid;
+  animation: spinIn 1s 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+/* Like the original portfolio portrait: a cut-out 200px wide, standing on the bottom of the frame,
+   never cropped. Photos that still have a background are letterboxed rather than cut off. */
+.avatar {
+  width: 200px;
+  height: 300px;
+  object-fit: contain;
+  object-position: bottom;
+  transform: translateY(0.5rem) rotate(-5deg);
+  justify-self: center;
+  align-self: end;
+}
+
+.avatarFallback {
+  composes: avatar;
+  height: 280px;
+  display: grid;
+  place-items: center;
+  background: var(--first-color);
+  font-size: 4rem;
+  font-weight: 600;
+}
+
+.greeting {
+  text-align: center;
+  font-size: var(--h1-font-size);
+  font-weight: 400 !important;
+}
+
+.name {
+  text-align: center;
+  font-size: var(--biggest-font-size);
+  line-height: 1.1;
+}
+
+.headline {
+  text-align: center;
+  margin-top: 0.5rem !important;
+  font-weight: 500;
+}
+
+.badge {
+  display: inline-block;
+  margin-top: 0.75rem;
+  padding: 0.2rem 0.75rem;
+  border: 1px solid var(--black-color);
+  border-radius: 4rem;
+  font-size: var(--small-font-size);
+  font-weight: 600;
+}
+
+.badgeRow {
+  text-align: center;
+}
+
+.buttons {
+  display: flex;
+  column-gap: 0.5rem;
+  justify-self: center;
+  width: max-content;
+  margin: 1rem auto 2rem;
+  border: 1px solid var(--black-color);
+  box-shadow: 0 4px 0 var(--black-color);
+  border-radius: 4rem;
+  padding: 0.25rem;
+}
+
+.button {
+  background-color: var(--body-color);
+  color: var(--title-color);
+  padding: 0.75rem 1.5rem;
+  border: none;
+  border-radius: 4rem;
+  font: inherit;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.3s;
+}
+
+.button:hover {
+  background-color: var(--first-color-alt);
+}
+
+.buttonActive {
+  composes: button;
+  background-color: var(--first-color);
+}
+
+.description {
+  line-height: 1.6;
+  white-space: pre-line;
+}
+
+/* ============ TABS ============ */
+.panel {
+  display: grid;
+  animation: fadeUp 0.4s ease both;
+}
+
+/* ============ LISTS ============ */
+.bullets {
+  list-style: initial;
+  padding-left: 2rem;
+  display: grid;
+  row-gap: 0.25rem;
+  line-height: 1.5;
+}
+
+.tools {
+  list-style: none;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 1rem;
+}
+
+.tool {
+  display: flex;
+  align-items: center;
+  column-gap: 0.35rem;
+  transition: transform 0.4s;
+}
+
+.tool:hover {
+  transform: translateX(0.5rem);
+}
+
+.toolIcon {
+  width: 1rem;
+  height: 1rem;
+}
+
+.toolDot {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  background: var(--first-color);
+  border: 1px solid var(--black-color);
+}
+
+.toolName {
+  font-size: var(--small-font-size);
+}
+
+.experience {
+  display: grid;
+  row-gap: 2rem;
+}
+
+.expTitles {
+  display: grid;
+  row-gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.expTitles :is(p, h3) {
+  font-size: var(--normal-font-size);
+  font-weight: 600;
+}
+
+.education {
+  list-style: none;
+  padding: 0;
+  display: grid;
+  row-gap: 1.5rem;
+}
+
+.eduItem {
+  display: grid;
+  row-gap: 0.25rem;
+}
+
+.eduItem :is(p, h3) {
+  font-size: var(--normal-font-size);
+  font-weight: 600;
+}
+
+.empty {
+  opacity: 0.6;
+  font-style: italic;
+}
+
+/* ============ PROJECTS ============ */
+.projectGrid {
+  display: grid;
+  gap: 1.5rem;
+}
+
+.projectImageLink {
+  display: block;
+  overflow: hidden;
+  margin-bottom: 1rem;
+  aspect-ratio: 16 / 10;
+  background: var(--first-color);
+}
+
+.projectImage {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  transition: transform 0.4s;
+}
+
+.projectImageLink:hover .projectImage {
+  transform: scale(1.1);
+}
+
+.projectName {
+  font-size: var(--normal-font-size);
+  margin-bottom: 0.5rem !important;
+}
+
+.projectLinks {
+  display: flex;
+  column-gap: 1.25rem;
+  margin-top: 0.75rem;
+  font-size: var(--small-font-size);
+  font-weight: 600;
+}
+
+.projectLinks a:hover {
+  text-decoration: underline;
+}
+
+/* ============ FOOTER ============ */
+.footer {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 1rem 2rem;
+  padding-block: 2rem;
+}
+
+.footerLink {
+  font-weight: 500;
+  transition: transform 0.4s;
+  overflow-wrap: anywhere;
+}
+
+.footerLink:hover {
+  transform: translateY(-0.5rem);
+}
+
+/* ============ ANIMATIONS ============ */
+@keyframes enter {
+  from { opacity: 0; transform: translateY(-2rem); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes spinIn {
+  from { opacity: 0; transform: rotate(-50deg) scale(0); }
+  to { opacity: 1; transform: rotate(5deg) scale(1); }
+}
+
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(1rem); }
+  to { opacity: 1; transform: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .content,
+  .imageFrame,
+  .panel {
+    animation: none;
+  }
+}
+
+/* ============ PRINT / PDF ============ */
+@media print {
+  /* White paper prints cleanly edge to edge; the accent color stays. */
+  .root {
+    --body-color: #fff;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+    overflow: visible;
+  }
+
+  .content,
+  .imageFrame,
+  .panel {
+    animation: none;
+  }
+
+  .buttons {
+    display: none;
+  }
+
+  .section {
+    padding-block: 1rem;
+  }
+
+  .imageFrame {
+    width: 150px;
+    height: 210px;
+    margin-bottom: 0.5rem;
+  }
+
+  .avatar {
+    width: 125px;
+    height: 175px;
+  }
+
+  .experience article,
+  .eduItem {
+    break-inside: avoid;
+  }
+
+  .footer {
+    padding-block: 0.5rem;
+  }
+
+  /* Paper can't be clicked: print the address after each footer link. */
+  .footerLink[href^="http"]::after {
+    content: " (" attr(href) ")";
+    font-weight: 400;
+  }
+}
+
+/* ============ BREAKPOINTS ============ */
+@media (width >= 768px) {
+  .projectGrid {
+    grid-template-columns: repeat(2, minmax(0, 350px));
+  }
+}
+
+@media (width >= 1150px) {
+  .root {
+    --biggest-font-size: 4.5rem;
+    --h1-font-size: 2rem;
+    --normal-font-size: 1rem;
+    --small-font-size: 0.875rem;
+  }
+
+  .content {
+    max-width: 1120px;
+    margin: 4rem auto;
+    padding-inline: 10rem;
+    box-shadow: 0 0 16px hsla(0, 0%, 0%, 0.1);
+  }
+
+  .section {
+    padding-block: 2.5rem;
+  }
+
+  .group {
+    display: grid;
+    grid-template-columns: 320px 530px;
+  }
+
+  .left {
+    border-right: 3px dashed var(--black-color);
+  }
+
+  .profile {
+    grid-template-columns: 540px 260px;
+    column-gap: 2rem;
+    align-items: center;
+    padding-top: 2rem;
+  }
+
+  .profileData {
+    order: -1;
+  }
+
+  .greeting,
+  .name,
+  .headline,
+  .badgeRow {
+    text-align: initial;
+  }
+
+  .buttons {
+    /* Chromium applies justify-self to block boxes too, so reset both. */
+    justify-self: start;
+    margin-left: 0;
+    margin-right: 0;
+  }
+
+  .imageFrame {
+    margin: 0;
+  }
+
+  .tools {
+    flex-direction: column;
+    align-items: initial;
+  }
+
+  .tool {
+    column-gap: 0.5rem;
+  }
+
+  .toolIcon {
+    width: 1.5rem;
+    height: 1.5rem;
+  }
+
+  .toolName {
+    font-size: var(--normal-font-size);
+  }
+
+  .expTitles {
+    grid-template-columns: 120px 1fr;
+    column-gap: 2rem;
+  }
+
+  .expHighlights {
+    padding-left: 10.5rem;
+  }
+
+  .eduItem {
+    grid-template-columns: 115px 1fr;
+    column-gap: 2.5rem;
+  }
+
+  .footer {
+    justify-content: space-between;
+    padding-block: 3rem;
+  }
+}

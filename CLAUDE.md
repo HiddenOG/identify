@@ -1,0 +1,82 @@
+@AGENTS.md
+
+# Identify (renamed from "Buildfolio" on 2026-10-29; the folder is still `buildfolio`)
+
+The product name lives in `SITE_NAME` (`src/lib/site.ts`); use it instead of writing the name in UI text.
+
+A niche social platform for tech people: a Medium-style feed of **tech project posts** (README-style write-ups with cover image, demo and repo links). Clicking an author opens their **profile = CV page + their projects**. CVs are filled by form or by AI parsing an uploaded CV.
+
+The CV design for template #1 ("classic") comes from the owner's static portfolio at `c:\Users\Godson\responsive-digital-resume-portfolio-main` (index.html + assets/css/styles.css).
+
+## Stack
+
+- Next.js 16 App Router, TypeScript, Tailwind v4. Next 16 rules: `src/proxy.ts` (not middleware), `params`/`searchParams`/`cookies()` are async, use `PageProps<'/route'>` helpers.
+- Supabase: auth, Postgres with Row Level Security, storage. Access via `@supabase/ssr` (server + browser clients in `src/lib/supabase/`). Schema lives in `supabase/migrations/`.
+- Zod for validating CV data (`src/lib/cv/schema.ts`), form or AI.
+
+## Core design rule
+
+CV **content** is stored once as structured JSON (`cv_content.data`). A **template** is a React component that renders that data; a **theme** is a set of CSS variables (colors + fonts). New CV styles = new template component, no data migration.
+
+## Stages
+
+1. **Foundation** — app scaffold, DB schema + RLS, auth (email + GitHub), username onboarding, header layout, profile page `/[username]` with CV template #1 and theme vars.
+2. **Projects** — Markdown project editor with cover image, project page `/[username]/p/[slug]`, Medium-style home feed.
+3. **Social** — likes, comments, tag feeds, search.
+4. **CV builder** — form editor with live preview, theme/font picker.
+5. **AI** — CV upload → Claude → structured JSON → prefilled editor; GitHub README import for projects.
+6. **Growth** — more templates, open-to-work badge, recruiter filters, follows, notifications, PDF export.
+
+## Progress
+
+- [x] Stage 1 (code complete 2026-10-27): scaffold, schema + RLS migration, Supabase clients + proxy, email/GitHub auth, onboarding, header, home, `/[username]` with classic template, `/preview/[template]`. Build, tsc and lint pass.
+- [x] Stage 1 verified end to end by owner on 2026-10-27 (Supabase project vrjsouxjxetyukmidora, sign-up → onboarding → /godson).
+- [x] Stage 2 (code complete 2026-10-27): `/new` editor (cover upload to `project-images`, tags, links, Markdown write/preview), `/[username]/[slug]` article page, `/[username]/[slug]/edit` + delete, home feed (cached, tag `projects`), CV Projects tab + owner drafts bar. Build/tsc/lint pass; queries validated against the live DB.
+- [ ] Stage 2 remaining: owner posts a real project and checks feed, article page, edit, and CV Projects tab.
+- [x] Stage 3 (code complete 2026-10-27): optimistic like button (`toggleLike`), comments with author/owner delete (`lib/social*.ts`), `/tags/[tag]` (cached), `/search` (projects by title/summary/tag + people), header search, trending tags on home. Queries validated against the live DB; no new migration needed.
+- [ ] Stage 3 remaining: owner tests like/unlike, comment/delete with a second account.
+- [x] Stage 4 (code complete 2026-10-27): `/settings` CV editor (`app/settings/cv-editor.tsx` + `saveSettings` action): basics, avatar upload to `avatars`, open-to-work, summary, skills, tools, experience/education with reorder, links (validated http(s)/email/phone), theme presets + custom colors + font, Edit/Preview tabs. Header shows avatar + "Edit CV".
+- [ ] Stage 4 remaining: owner fills in their CV and checks the public page.
+- [x] Stage 5 (code complete 2026-10-27): CV import in `/settings` (`lib/import/*`): PDF/DOCX → text (unpdf/mammoth) → AI providers in `AI_PROVIDERS` order (Groq, Gemini, OpenRouter, Claude; each only if its key is set) → fallback `rule-parser.ts`. GitHub repo import in the project editor (`lib/import/github.ts`, no AI). Rule parser + GitHub import tested offline on a sample PDF and the Rombus README.
+- [ ] Stage 5 remaining: owner adds whichever AI keys they want and tries a real CV; GitHub import live test (api.github.com cert wasn't valid yet on this machine's clock on 2026-10-27).
+- [x] Stage 6a (code complete 2026-10-27): migration `20261028000000_growth.sql` (follows, notifications filled by `notify_activity()` triggers, `profiles.cv_search` generated column); `/people` recruiter directory (name, skill/tool, location, open-to-work); follow button + counts bar on profiles; `/following` feed; `/notifications` + header bell with unread count; Download PDF (`window.print()` + print CSS in the classic template); Vercel deploy steps in README. Proxy now matches protected routes by whole path segment. Build/tsc/lint pass; PDF output checked with headless Edge.
+- [ ] Stage 6a remaining: owner runs the growth migration in the Supabase SQL Editor, then tests follow/notifications with a second account.
+- [x] UI refresh, Medium-inspired (2026-10-27): light/dark/system appearance (`lib/theme.ts` inline head script + `components/theme.tsx`), color tokens in `globals.css` (`surface`, `highlight`, `brand-ink`, `success`, `danger`; no hard-coded hex in components), sticky icon header with avatar dropdown (`user-menu.tsx`), landing hero for signed-out visitors with `hero-balloons.tsx` (balloon shapes: parallax on scroll, scatter from the pointer, rAF only while the hero is visible, off for reduced motion), feed cards and sidebar (most liked, topics, who to follow), serif reading body (Source Serif 4 = `--font-serif`), "Built by" card with follow on project pages, site footer.
+- [x] Medium-style sidebar + Library/Stories/Stats (2026-10-28): migration `20261029000000_library_stats.sql` (`bookmarks`, `project_events` written only via `record_project_event()` RPC, deduped per viewer/project/kind/UTC day, author visits ignored; `my_daily_stats` / `my_period_totals` / `my_story_stats` RPCs). Sidebar state is CSS on `<html data-sidebar data-docked>` set by the head script (`lib/sidebar.ts`) and `SidebarSync` (inside Suspense); docks on feed pages at lg+, overlays elsewhere; closed by default for signed-out visitors. `/library`, `/stories`, `/stats` (Stories + Audience tabs, `components/line-chart.tsx`, chart colors `--chart-1/2` validated with the dataviz checker). Bookmark button + `TrackView` on project pages.
+- [ ] Owner runs `20261029000000_library_stats.sql`, then checks sidebar, Library, Stats with a second account generating views.
+- [x] Settings like Medium (2026-10-29): `/settings` = Account tab (row layout: email change, username change, profile info → CV tab, appearance, profile design, open to work, password, sign out everywhere, delete account via `delete_own_account()` RPC in migration `20261030000000_account.sql`); `/settings/cv` = the CV editor (moved to `app/settings/cv/`). Avatar menu slimmed to profile, Appearance, Settings, Edit CV, Sign out: nothing the sidebar already has.
+- [ ] Owner runs `20261030000000_account.sql` (only needed for Delete account).
+- [x] Explore topics (2026-10-29): catalog in `lib/topics.ts` (9 categories, 204 topics: tech roles, languages, frameworks, cloud/data tools, plus design, business, finance, HR, law, engineering, science, supply chain, health, education, creative). A topic = a project tag (`topicSlug`), so its page is `/tags/<slug>`. `/topics` directory (chips, search, More / Show all, project counts); header search dropdown (`header-search.tsx`, CSS focus-within) shows Explore topics / matching topics.
+- [x] Landing for visitors (2026-10-29): pitch = CV website + projects; hero buttons Start reading / Upload your CV; extra links live in the sidebar card (`CARD_LINKS`); newsletter-style "Claim your CV website" strip at the bottom for visitors (`claim-form.tsx`: checks username free, stores it in `bf_claim` cookie, onboarding pre-fills it). Owner rejected full-width marketing bands under the hero: keep the landing lean. Home tabs are Featured (trending, falls back to latest) / Latest for everyone.
+- [x] Private messages + PDF for members only (2026-10-29): migration `20261031000000_messages.sql` (`conversations` one row per pair with user_a < user_b, created via `start_conversation()` RPC; `messages` with member-only RLS via `is_conversation_member()`, read receipts via `read_at`; added to the `supabase_realtime` publication). `/messages` inbox + `/messages/[id]` live thread (`app/messages/thread.tsx` subscribes to INSERT/UPDATE). Message button on profiles and the project "Built by" card; header messages icon with unread count; sidebar link. CV PDF: visitors' Download PDF goes to sign-in, and printing while signed out shows a sign-in note (`signed-out:print:` classes).
+- [ ] Owner runs `20261031000000_messages.sql`, then tests messaging between two accounts.
+- [x] Cut-out profile photos (2026-10-29): `lib/cutout.ts` removes the background in the browser with transformers.js 4.3.1 (`pipeline("background-removal", "Xenova/modnet")`, MODNet is Apache-2.0; avoid briaai/RMBG and @imgly, which are non-commercial/AGPL), trims to the person and uploads a PNG. Classic template shows the avatar like the original portfolio (200px wide, `object-contain object-bottom`, never cropped). Round avatars crop to head and shoulders (`object-top`, `bg-surface`). Model is ~25 MB from the Hugging Face CDN, loaded only on upload.
+- [x] Library → History (2026-10-29): migration `20261101000000_history.sql` (`reading_history`, owner-only RLS, one row per user+project). `recordProjectEvent("view")` upserts it for signed-in readers; `/library?tab=history` with Clear history (`clearHistory` + `refresh()`).
+- [ ] Owner runs the pending migrations in order: `20261030000000_account.sql`, `20261031000000_messages.sql`, `20261101000000_history.sql`.
+- [x] Mobile like the Medium app (2026-11-01): `MobileTabBar` (Home · Following · Search · Library · avatar) + green compose FAB for signed-in phones (`components/mobile-nav.tsx` + `mobile-tab-bar.tsx`, hidden on editor/messages/settings); header drops Search/Write on phones; `/search` is "Explore" (search, topic chips, numbered Trending).
+- [x] Discover (2026-11-01): migration `20261102000000_discover.sql` (`admins` + `is_admin()`, `portfolios` with status pending/listed/claimed/removed, admin-only `portfolio_contacts` with `do_not_contact`, `portfolio_claims`, `portfolio_removals`; RPCs `claim_portfolio_by_email`, `request_portfolio_removal` for anyone). Curated, not crawled: admin pastes a URL at `/admin/discover`, `lib/discover/site.ts` reads its og: preview (robots.txt honoured, private/local hosts blocked on every redirect hop). Cards show the site's own sharing image (never our screenshots of their site), name, role, Unclaimed / On Identify. `/discover` (new members row, featured bento, discipline tiles), `/discover/[category]`, `/discover/claim/[id]` (public so invite links show the listing first; instant if sign-in email = contact email; otherwise a meta-tag code an admin re-checks), `/discover/remove/[id]` (no account; unclaimed listings come down at once), `/discover/suggest` (members, goes to the queue). Invites are `mailto:` links from the admin page (personal, low volume). Home shows a Discover strip to visitors above the feed.
+- [ ] Owner runs `20261102000000_discover.sql`, makes themselves an admin (README), and adds the first portfolios.
+- [ ] Stage 6b: more CV templates. Waiting on a design (the owner has none yet); every template takes `TemplateProps` and registers in `components/cv/render-template.tsx`, and needs its own print CSS.
+
+## Owner preferences
+
+- Do NOT run anything that calls the owner's AI API keys (Claude credits are low). Test AI paths only with stubs; the owner tests live.
+
+## Conventions learned
+
+- `cacheComponents` is ON (create-next-app default). Anything reading cookies/params/searchParams must sit inside `<Suspense>`; pages split into a sync shell + async inner component.
+- Public reads (home list, metadata) use `createPublicClient()` (cookie-free, OK inside `"use cache"`); user-specific reads use `createClient()` from `lib/supabase/server`.
+- `next.config.ts` runs the Tailwind Turbopack loader on `*.css` but must exclude `*.module.css` (condition already set), or CSS Module class names come out `undefined`.
+- `createClient()` in `lib/supabase/server.ts` calls `await connection()` first: Supabase auth uses `Date.now()`, which Cache Components rejects during prerender/prefetch.
+- Embedding profiles from projects needs the FK hint `profiles!projects_author_id_fkey` (likes/comments make it ambiguous, PGRST201). Same for notifications (`profiles!notifications_actor_id_fkey`).
+- Use theme tokens (`bg-surface`, `text-danger`, `bg-brand text-brand-ink`, …), never hex or palette colors, so dark mode works. Dark styles use the `dark:` variant (keyed to `data-theme`). After adding tokens or `@custom-variant`s to `globals.css`, Turbopack can keep serving stale CSS even across restarts: stop the dev server, delete `.next/`, start again.
+- `<html>` carries state attributes set before paint (lib/theme.ts, lib/sidebar.ts) and kept in sync by ThemeSync/SidebarSync: `data-theme`, `data-sidebar`, `data-docked`, `data-auth` (guessed from the `sb-…-auth-token` cookie, which must not match the `-code-verifier` cookie OAuth/sign-up leaves behind; then confirmed by `<AuthMark>` in the server-rendered header), `data-landing` (signed-out home). Matching CSS variants: `dark:`, `sidebar-open:`, `docked:`, `signed-out:`, `landing:`. The sidebar and ☰ exist only for signed-in users; the landing page has no header search.
+- With cacheComponents, `usePathname()`/`useSearchParams()` in a client component must render inside `<Suspense>` (and so must a Suspense *fallback* that uses them), or the build fails with CLIENT_HOOK_DYNAMIC.
+- Show uploaded images with `<RemoteImage>` (`components/remote-image.tsx`): Supabase Storage URLs go through next/image (WebP, resized, cached; `images.remotePatterns` in next.config.ts), other hosts fall back to `<img>`.
+- Pre-deploy check: `scratchpad/sweep/sweep.mjs` (Playwright + Edge) visits every route at 390px and 1440px against `next start -p 3100` and reports console errors, failed requests, horizontal overflow and LCP.
+- Anything that should not appear in a PDF of a CV gets `print:hidden` (site header, profile bar, preview theme picker).
+- After writes, call `updateTag(PROJECTS_TAG | PROFILES_TAG)` in the server action so cached home lists refresh.
+- Classic template: Chromium honours `justify-self` on block boxes, so reset it alongside margins in breakpoints.
+- Guard every Supabase call with `hasSupabaseEnv` on pages so the app runs without keys.
+- `next` survives the whole sign-up path (sign-in ↔ sign-up links, email confirmation, `/auth/callback`, `/onboarding?next=`); always pass it through `safeNext()` / `onboardingHref()` in `lib/next-path.ts`.
+- Scripts that use supabase-js on this machine's Node 20 need `NODE_OPTIONS=--experimental-websocket`.

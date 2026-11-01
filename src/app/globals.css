@@ -1,26 +1,116 @@
 @import "tailwindcss";
+@import "highlight.js/styles/github.css";
+@plugin "@tailwindcss/typography";
+
+/* Dark mode follows data-theme on <html>, set before paint by the inline script in app/layout.tsx. */
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+/* Left sidebar state, set on <html> before paint (lib/sidebar.ts). */
+@custom-variant sidebar-open (&:where([data-sidebar="open"] *));
+@custom-variant sidebar-closed (&:where([data-sidebar="closed"] *));
+@custom-variant docked (&:where([data-docked="true"] *));
+@custom-variant undocked (&:where([data-docked="false"] *));
+/* The signed-out home page (set with data-sidebar; see lib/sidebar.ts). */
+@custom-variant landing (&:where([data-landing="true"] *));
+/* No session cookie: visitors don't get the sidebar or its ☰ button. */
+@custom-variant signed-out (&:where([data-auth="out"] *));
 
 :root {
+  color-scheme: light;
   --background: #ffffff;
-  --foreground: #171717;
+  --foreground: #191919;
+  --muted: #6b6b6b;
+  --line: #e6e6e6;
+  --surface: #f2f2f2;
+  --surface-hover: #e8e8e8;
+  --brand: #a3ef6b;
+  --brand-ink: #191919;
+  --highlight: #fff6db;
+  --success: #1a8917;
+  --danger: #c4291c;
+  /* Chart series (validated with the dataviz palette checker against #fff / #121212). */
+  --chart-1: #2a78d6;
+  --chart-2: #eb6834;
+  --chart-grid: #ececec;
+  --chart-axis: #c9c9c9;
+}
+
+[data-theme="dark"] {
+  color-scheme: dark;
+  --background: #121212;
+  --foreground: #f2f2f2;
+  --muted: #a8a8a8;
+  --line: #2b2b2b;
+  --surface: #232323;
+  --surface-hover: #2e2e2e;
+  --highlight: #2f2a1c;
+  --success: #5fd068;
+  --danger: #ff7a6e;
+  --chart-1: #3987e5;
+  --chart-2: #d95926;
+  --chart-grid: #262626;
+  --chart-axis: #3a3a3a;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-muted: var(--muted);
+  --color-line: var(--line);
+  --color-surface: var(--surface);
+  --color-surface-hover: var(--surface-hover);
+  --color-brand: var(--brand);
+  --color-brand-ink: var(--brand-ink);
+  --color-highlight: var(--highlight);
+  --color-success: var(--success);
+  --color-danger: var(--danger);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --font-serif: var(--font-reading);
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+}
+
+/* While the sidebar slides over the page, the page underneath stays put; only the sidebar scrolls. */
+@media (width < 64rem) {
+  [data-sidebar="open"] body {
+    overflow: hidden;
+  }
+}
+@media (width >= 64rem) {
+  [data-sidebar="open"][data-docked="false"] body {
+    overflow: hidden;
+  }
+}
+
+/* highlight.js ships one light theme; these GitHub-dark token colors cover the dark one. */
+[data-theme="dark"] .hljs {
+  color: #e6edf3;
+  background: transparent;
+}
+[data-theme="dark"] :is(.hljs-keyword, .hljs-doctag, .hljs-meta .hljs-keyword, .hljs-template-tag, .hljs-template-variable, .hljs-type, .hljs-variable.language_) {
+  color: #ff7b72;
+}
+[data-theme="dark"] :is(.hljs-title, .hljs-title.class_, .hljs-title.function_) {
+  color: #d2a8ff;
+}
+[data-theme="dark"] :is(.hljs-attr, .hljs-attribute, .hljs-literal, .hljs-meta, .hljs-number, .hljs-operator, .hljs-variable, .hljs-selector-attr, .hljs-selector-class, .hljs-selector-id) {
+  color: #79c0ff;
+}
+[data-theme="dark"] :is(.hljs-regexp, .hljs-string, .hljs-meta .hljs-string) {
+  color: #a5d6ff;
+}
+[data-theme="dark"] :is(.hljs-built_in, .hljs-symbol) {
+  color: #ffa657;
+}
+[data-theme="dark"] :is(.hljs-comment, .hljs-code, .hljs-formula) {
+  color: #8b949e;
+}
+[data-theme="dark"] :is(.hljs-name, .hljs-quote, .hljs-selector-tag, .hljs-selector-pseudo) {
+  color: #7ee787;
 }
