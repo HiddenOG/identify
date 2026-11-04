@@ -73,6 +73,8 @@ export async function toggleFollow(profileId: string): Promise<{ following?: boo
     ? await supabase.from("follows").delete().eq("follower_id", userId).eq("following_id", profileId)
     : await supabase.from("follows").insert({ follower_id: userId, following_id: profileId });
   if (error) return { error: error.message };
+  // Re-render with the new state; otherwise the button's optimistic "Following" snaps back.
+  refresh();
   return { following: !existing };
 }
 
@@ -93,6 +95,8 @@ export async function toggleBookmark(projectId: string): Promise<{ saved?: boole
     ? await supabase.from("bookmarks").delete().eq("user_id", userId).eq("project_id", projectId)
     : await supabase.from("bookmarks").insert({ user_id: userId, project_id: projectId });
   if (error) return { error: error.message };
+  // Re-render with the new state; otherwise the button's optimistic "saved" snaps back.
+  refresh();
   return { saved: !existing };
 }
 
