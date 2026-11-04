@@ -5,6 +5,7 @@ import { AuthorAvatar } from "@/components/author-avatar";
 import { ClaimForm } from "@/components/claim-form";
 import { PortfolioBento } from "@/components/discover/portfolio-card";
 import { FeedTabs } from "@/components/feed-tabs";
+import { GetStarted } from "@/components/get-started";
 import { FollowButton } from "@/components/follow-button";
 import { HeroBalloons } from "@/components/hero-balloons";
 import { LavaLamp, type LavaBlob } from "@/components/lava-lamp";
@@ -83,8 +84,9 @@ export default async function Home() {
         <div id="feed" className="mx-auto flex max-w-6xl scroll-mt-14 justify-center gap-12 px-4 sm:px-6 xl:gap-20">
           <section className="min-w-0 max-w-[680px] flex-1 py-8">
             <Suspense>
-              <DiscoverStrip />
+              <GetStarted />
             </Suspense>
+            <DiscoverStrip />
             <FeedTabs
               tabs={[
                 {
@@ -167,9 +169,8 @@ async function Landing() {
   );
 }
 
-/** Visitors only, above the feed: three portfolios from Discover, featured first. */
+/** Above the feed for everyone: three portfolios from Discover, featured first. Cached, no cookies. */
 async function DiscoverStrip() {
-  if (await isSignedInMember(await createClient())) return null;
   const portfolios = await getCachedPortfolios();
   if (portfolios.length === 0) return null;
   return (
