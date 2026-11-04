@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition, type ReactNode } from "react";
+import { useEffect, useState, useTransition, type ReactNode } from "react";
 import Link from "next/link";
 import { ClassicTemplate } from "@/components/cv/classic-template";
 import type { CVProject } from "@/components/cv/types";
@@ -96,6 +96,13 @@ export function CvEditor({ userId, initial, projects }: { userId: string; initia
   // Stable keys so uncontrolled highlight textareas follow their role when reordered/removed.
   const [jobKeys, setJobKeys] = useState(() => initial.cv.experience.map(() => crypto.randomUUID()));
   const dirty = JSON.stringify(state) !== baseline;
+  // Closing or reloading the tab with unsaved changes asks first (an import isn't saved until Save CV).
+  useEffect(() => {
+    if (!dirty) return;
+    const warn = (e: BeforeUnloadEvent) => e.preventDefault();
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [dirty]);
   // Bumping this remounts the form so uncontrolled textareas pick up imported values.
   const [formKey, setFormKey] = useState(0);
   const [importing, startImporting] = useTransition();
@@ -193,7 +200,8 @@ export function CvEditor({ userId, initial, projects }: { userId: string; initia
       setState(cleaned);
       setJobKeys((keys) => keys.filter((_, i) => keepJob[i]));
       setBaseline(JSON.stringify(cleaned));
-      setStatus({ kind: "ok", text: "Saved." });
+      setStatus({ kind: "ok", text: "Saved. Your CV website is up to date." });
+      setImportInfo((info) => (info?.kind === "ok" ? { kind: "ok", text: "Saved. Your CV website now shows what was imported." } : info));
     });
   }
 
@@ -277,6 +285,17 @@ export function CvEditor({ userId, initial, projects }: { userId: string; initia
                 {importInfo.text}
                 {importInfo.notes && importInfo.notes.length > 0 && (
                   <span className="mt-1 block text-xs opacity-80">Tried first: {importInfo.notes.join("; ")}.</span>
+                )}
+                {/* Uploading only fills the form; make saving one obvious click away. */}
+                {importInfo.kind === "ok" && dirty && (
+                  <button
+                    type="button"
+                    onClick={save}
+                    disabled={saving || Boolean(uploading)}
+                    className="mt-3 block rounded-full bg-foreground px-5 py-2 font-medium text-background disabled:opacity-50"
+                  >
+                    {saving ? "Saving…" : "Looks good, save CV now"}
+                  </button>
                 )}
               </div>
             )}
@@ -555,7 +574,9 @@ export function CvEditor({ userId, initial, projects }: { userId: string; initia
         {status && (
           <p className={`mr-auto text-sm ${status.kind === "ok" ? "text-success" : "text-danger"}`}>{status.text}</p>
         )}
-        {!status && dirty && <p className="mr-auto text-sm text-muted">Unsaved changes</p>}
+        {!status && dirty && (
+          <p className="mr-auto text-sm font-medium text-danger">Not saved yet: your CV website won&apos;t change until you save.</p>
+        )}
         <button
           type="button"
           onClick={save}
