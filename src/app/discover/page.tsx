@@ -3,12 +3,10 @@ import Link from "next/link";
 import { PortfolioBento, PortfolioCard } from "@/components/discover/portfolio-card";
 import { ShowMore } from "@/components/show-more";
 import { SiteImage } from "@/components/discover/site-image";
-import { RemoteImage } from "@/components/remote-image";
 import { SetupNotice } from "@/components/setup-notice";
-import { getCachedNewMembers, getCachedPortfolios } from "@/lib/discover/cached";
+import { getCachedPortfolios } from "@/lib/discover/cached";
 import { PORTFOLIO_CATEGORIES } from "@/lib/discover/categories";
 import { displayHost } from "@/lib/discover/site";
-import { SITE_NAME } from "@/lib/site";
 import { hasSupabaseEnv } from "@/lib/supabase/env";
 
 export const metadata: Metadata = {
@@ -25,7 +23,8 @@ export default async function DiscoverPage() {
     );
   }
 
-  const [portfolios, members] = await Promise.all([getCachedPortfolios(), getCachedNewMembers()]);
+  // Only what an admin lists appears here; new sign-ups are never added automatically.
+  const portfolios = await getCachedPortfolios();
   const featured = portfolios.slice(0, 3);
   const featuredIds = new Set(featured.map((p) => p.id));
   const shelves = PORTFOLIO_CATEGORIES.map((c) => {
@@ -47,30 +46,6 @@ export default async function DiscoverPage() {
           Suggest a portfolio
         </Link>
       </div>
-
-      {members.length > 0 && (
-        <section className="mb-14">
-          <h2 className="mb-4 text-xl font-bold">New on {SITE_NAME}</h2>
-          <ul className="-mx-4 flex snap-x gap-4 overflow-x-auto px-4 pb-2 [scrollbar-width:none] sm:mx-0 sm:px-0">
-            {members.map((m) => (
-              <li key={m.id} className="w-40 shrink-0 snap-start sm:w-44">
-                <Link href={`/${m.username}`} className="group block">
-                  <div className="aspect-[4/5] overflow-hidden rounded-2xl border border-line bg-surface">
-                    <RemoteImage
-                      src={m.avatar_url!}
-                      alt=""
-                      sizes="176px"
-                      className="size-full object-contain object-bottom transition-transform duration-500 group-hover:scale-[1.03]"
-                    />
-                  </div>
-                  <p className="mt-2 truncate font-bold group-hover:underline">{m.full_name || m.username}</p>
-                  <p className="truncate text-sm text-muted">{m.headline || `@${m.username}`}</p>
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
 
       {portfolios.length === 0 ? (
         <p className="py-10 text-muted">
