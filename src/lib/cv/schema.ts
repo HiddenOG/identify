@@ -15,6 +15,13 @@ export const experienceSchema = z.object({
 export const educationSchema = z.object({
   title: z.string().max(160),
   meta: z.string().max(80).default(""),
+  /** Optional proof: an uploaded certificate (PDF or image) or a verification page. Web links only. */
+  url: z
+    .string()
+    .trim()
+    .max(400)
+    .refine((v) => v === "" || /^https?:\/\/\S+$/i.test(v), "Certificate links must start with https://")
+    .default(""),
 });
 
 /** Links render as <a href>, so only allow web URLs (no javascript: etc). Empty = not set. */

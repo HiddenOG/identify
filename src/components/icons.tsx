@@ -116,6 +116,26 @@ export const StatsIcon = (p: IconProps) => (
   </Icon>
 );
 
+export const PaperclipIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <path d="m20 11.5-7.6 7.6a5 5 0 0 1-7.1-7.1l8.1-8.1a3.3 3.3 0 0 1 4.7 4.7l-8.1 8.1a1.7 1.7 0 0 1-2.4-2.4l7.4-7.4" />
+  </Icon>
+);
+
+export const SmileIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <circle cx="12" cy="12" r="8.5" />
+    <path d="M8.5 14.5c.9 1.2 2.1 1.8 3.5 1.8s2.6-.6 3.5-1.8M9.2 9.7h.01M14.8 9.7h.01" strokeWidth={2} />
+  </Icon>
+);
+
+export const ReplyIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <path d="M9.5 6.5 4 12l5.5 5.5" />
+    <path d="M4 12h10a6 6 0 0 1 6 6v.5" />
+  </Icon>
+);
+
 export const MessageIcon = (p: IconProps) => (
   <Icon {...p}>
     <path d="M4 6.5A1.5 1.5 0 0 1 5.5 5h13A1.5 1.5 0 0 1 20 6.5v9a1.5 1.5 0 0 1-1.5 1.5H10l-4 3.5V17h-.5A1.5 1.5 0 0 1 4 15.5z" />

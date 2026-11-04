@@ -161,7 +161,15 @@ export function ClassicTemplate({ profile, cv, theme, projects }: TemplateProps)
                     {cv.education.map((edu, i) => (
                       <li key={`${edu.title}-${i}`} className={s.eduItem}>
                         <p>{edu.meta}</p>
-                        <h3>{edu.title}</h3>
+                        <h3>
+                          {edu.url ? (
+                            <a href={edu.url} target="_blank" rel="noopener noreferrer" className={s.eduLink} title="View certificate">
+                              {edu.title} <span aria-hidden>↗</span>
+                            </a>
+                          ) : (
+                            edu.title
+                          )}
+                        </h3>
                       </li>
                     ))}
                   </ul>

@@ -7,6 +7,7 @@ import type { CVProject } from "@/components/cv/types";
 import type { CV, Education, Experience } from "@/lib/cv/schema";
 import { makeCutout } from "@/lib/cutout";
 import { createClient } from "@/lib/supabase/client";
+import { supabaseUrl } from "@/lib/supabase/env";
 import { FONT_OPTIONS, THEME_PRESETS, type FontKey, type Theme } from "@/lib/themes";
 import { saveSettings } from "./actions";
 import { importCv } from "./import-actions";
@@ -26,7 +27,9 @@ export type EditorState = {
 
 const input = "w-full rounded-md border border-line bg-background px-3 py-2 outline-none focus:border-foreground";
 const emptyJob: Experience = { role: "", company: "", location: "", period: "", highlights: [] };
-const emptyEdu: Education = { title: "", meta: "" };
+const emptyEdu: Education = { title: "", meta: "", url: "" };
+const MAX_CERT_BYTES = 5 * 1024 * 1024;
+const CERT_TYPES = ["application/pdf", "image/jpeg", "image/png", "image/webp"];
 
 /** Textarea-backed list: one item per line. */
 const toLines = (items: string[]) => items.join("\n");
@@ -91,6 +94,8 @@ export function CvEditor({ userId, initial, projects }: { userId: string; initia
   const [status, setStatus] = useState<{ kind: "ok" | "error"; text: string } | null>(null);
   // "cutting" while the background is removed in the browser, then "uploading".
   const [uploading, setUploading] = useState<"cutting" | "uploading" | null>(null);
+  // Which education entry is uploading its certificate, if any.
+  const [certUploading, setCertUploading] = useState<number | null>(null);
   const [removeBackground, setRemoveBackground] = useState(true);
   const [baseline, setBaseline] = useState(() => JSON.stringify(initial));
   // Stable keys so uncontrolled highlight textareas follow their role when reordered/removed.
@@ -145,6 +150,22 @@ export function CvEditor({ userId, initial, projects }: { userId: string; initia
   };
   const updateCv = (patch: Partial<CV>) => update({ cv: { ...state.cv, ...patch } });
   const updateTheme = (patch: Partial<EditorState["theme"]>) => update({ theme: { ...state.theme, ...patch } });
+
+  /** Uploads a certificate (PDF or image) for one education entry and links it. Saved with Save CV. */
+  async function uploadCertificate(index: number, file: File) {
+    if (!CERT_TYPES.includes(file.type)) return setStatus({ kind: "error", text: "Certificates can be a PDF or a photo (JPG, PNG, WebP)." });
+    if (file.size > MAX_CERT_BYTES) return setStatus({ kind: "error", text: "Certificates must be under 5 MB." });
+    setCertUploading(index);
+    const supabase = createClient();
+    const ext = file.type === "application/pdf" ? "pdf" : file.type.split("/")[1];
+    // Storage policies only allow writes under the user's own id folder.
+    const path = `${userId}/certificates/${crypto.randomUUID()}.${ext}`;
+    const { error } = await supabase.storage.from("project-images").upload(path, file, { contentType: file.type });
+    setCertUploading(null);
+    if (error) return setStatus({ kind: "error", text: error.message });
+    const url = supabase.storage.from("project-images").getPublicUrl(path).data.publicUrl;
+    update({ cv: { ...state.cv, education: state.cv.education.map((e, k) => (k === index ? { ...e, url } : e)) } });
+  }
 
   async function uploadAvatar(file: File) {
     if (!file.type.startsWith("image/")) return setStatus({ kind: "error", text: "Choose an image file." });
@@ -483,16 +504,56 @@ export function CvEditor({ userId, initial, projects }: { userId: string; initia
             {cv.education.map((edu, i) => {
               const setEdu = (patch: Partial<Education>) =>
                 updateCv({ education: cv.education.map((e, k) => (k === i ? { ...e, ...patch } : e)) });
+              const isUpload = Boolean(supabaseUrl) && edu.url.startsWith(`${supabaseUrl}/storage/`);
               return (
-                <div key={i} className="grid items-center gap-3 sm:grid-cols-[1fr_180px_auto]">
-                  <input className={input} placeholder="B.Sc. Computer Science - University of Lagos" value={edu.title} onChange={(e) => setEdu({ title: e.target.value })} />
-                  <input className={input} placeholder="2019 - 2023" value={edu.meta} onChange={(e) => setEdu({ meta: e.target.value })} />
-                  <RowControls
-                    index={i}
-                    length={cv.education.length}
-                    onMove={(to) => updateCv({ education: move(cv.education, i, to) })}
-                    onRemove={() => updateCv({ education: cv.education.filter((_, k) => k !== i) })}
-                  />
+                <div key={i} className="space-y-2 border-b border-line pb-4 last:border-0 last:pb-0">
+                  <div className="grid items-center gap-3 sm:grid-cols-[1fr_180px_auto]">
+                    <input className={input} placeholder="B.Sc. Computer Science - University of Lagos" value={edu.title} onChange={(e) => setEdu({ title: e.target.value })} />
+                    <input className={input} placeholder="2019 - 2023" value={edu.meta} onChange={(e) => setEdu({ meta: e.target.value })} />
+                    <RowControls
+                      index={i}
+                      length={cv.education.length}
+                      onMove={(to) => updateCv({ education: move(cv.education, i, to) })}
+                      onRemove={() => updateCv({ education: cv.education.filter((_, k) => k !== i) })}
+                    />
+                  </div>
+                  {/* Optional proof: upload the certificate, or link to a verification page. */}
+                  <div className="flex flex-wrap items-center gap-2">
+                    {isUpload ? (
+                      <span className="min-w-0 flex-1 truncate rounded-lg border border-line px-3 py-2 text-sm text-muted">📎 Certificate uploaded</span>
+                    ) : (
+                      <input
+                        className={`${input} min-w-0 flex-1 text-sm`}
+                        placeholder="Certificate link (optional), e.g. a Coursera or Credly page"
+                        value={edu.url}
+                        onChange={(e) => setEdu({ url: e.target.value })}
+                      />
+                    )}
+                    <label className={`cursor-pointer rounded-full border border-line px-3 py-1.5 text-sm hover:border-foreground ${certUploading === i ? "opacity-60" : ""}`}>
+                      {certUploading === i ? "Uploading…" : isUpload ? "Replace" : "Upload PDF"}
+                      <input
+                        type="file"
+                        accept={CERT_TYPES.join(",")}
+                        className="sr-only"
+                        disabled={certUploading !== null}
+                        onChange={(e) => {
+                          const chosen = e.target.files?.[0];
+                          e.target.value = "";
+                          if (chosen) void uploadCertificate(i, chosen);
+                        }}
+                      />
+                    </label>
+                    {edu.url && (
+                      <>
+                        <a href={edu.url} target="_blank" rel="noopener noreferrer" className="text-sm underline">
+                          View
+                        </a>
+                        <button type="button" onClick={() => setEdu({ url: "" })} className="text-sm text-muted hover:text-danger">
+                          Remove link
+                        </button>
+                      </>
+                    )}
+                  </div>
                 </div>
               );
             })}

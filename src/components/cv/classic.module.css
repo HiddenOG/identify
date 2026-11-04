@@ -259,6 +259,18 @@
   font-weight: 600;
 }
 
+/* A certificate or verification link on an education entry. */
+.eduLink {
+  color: inherit;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+}
+
+.eduLink:hover {
+  text-decoration-thickness: 2px;
+}
+
 .empty {
   opacity: 0.6;
   font-style: italic;

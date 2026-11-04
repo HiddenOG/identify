@@ -4,7 +4,28 @@ import { shortTime } from "@/lib/time";
 
 export type Person = ProjectAuthor & { id: string; headline: string | null };
 
-export type Message = { id: string; conversation_id: string; sender_id: string; body: string; created_at: string; read_at: string | null };
+export type Message = {
+  id: string;
+  conversation_id: string;
+  sender_id: string;
+  body: string;
+  created_at: string;
+  read_at: string | null;
+  /** The message this one replies to (same conversation). */
+  reply_to?: string | null;
+  /** A photo or file in the private message-files bucket: "<conversation>/<sender>/<file>". */
+  attachment_path?: string | null;
+  attachment_name?: string | null;
+  attachment_type?: string | null;
+  attachment_size?: number | null;
+};
+
+/** What the inbox shows for a message: its text, or what was attached. */
+export function messagePreview(m: Pick<Message, "body" | "attachment_type" | "attachment_name">) {
+  if (m.body) return m.body;
+  if (m.attachment_type?.startsWith("image/")) return "📷 Photo";
+  return m.attachment_name ? `📎 ${m.attachment_name}` : "📎 File";
+}
 
 export type ConversationSummary = {
   id: string;
@@ -38,7 +59,7 @@ export async function getConversations(supabase: SupabaseClient, me: string): Pr
   // Recent messages across these conversations: the newest per conversation is its preview.
   const { data: recent } = await supabase
     .from("messages")
-    .select("conversation_id, sender_id, body, read_at, created_at")
+    .select("conversation_id, sender_id, body, read_at, created_at, attachment_type, attachment_name")
     .in("conversation_id", rows.map((r) => r.id))
     .order("created_at", { ascending: false })
     .limit(500)
@@ -61,7 +82,7 @@ export async function getConversations(supabase: SupabaseClient, me: string): Pr
         lastMessageAt: r.last_message_at,
         when: shortTime(r.last_message_at, now),
         other: r.user_a === me ? r.b : r.a,
-        preview: last.body,
+        preview: messagePreview(last),
         previewMine: last.sender_id === me,
         unread: unread.get(r.id) ?? 0,
       };

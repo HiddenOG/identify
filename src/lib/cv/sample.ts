@@ -58,9 +58,10 @@ export const sampleCV: CV = {
     },
   ],
   education: [
-    { title: "B.Sc. Biotechnology - University of Benin", meta: "2019 - 2023" },
-    { title: "CS50's Introduction to AI with Python", meta: "Harvard Online" },
-    { title: "Machine Learning Specialization - Stanford / Coursera", meta: "2023" },
+    { title: "B.Sc. Biotechnology - University of Benin", meta: "2019 - 2023", url: "" },
+    // A linked certificate, to show what that looks like on the sample CV.
+    { title: "CS50's Introduction to AI with Python", meta: "Harvard Online", url: "https://cs50.harvard.edu/ai/" },
+    { title: "Machine Learning Specialization - Stanford / Coursera", meta: "2023", url: "" },
   ],
   links: { github: "https://github.com/HiddenOG" },
 };
