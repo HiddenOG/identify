@@ -65,7 +65,14 @@ export function AuthForm({ mode, next, initialError }: { mode: "signin" | "signu
           />
         </label>
         <label className="block">
-          <span className="mb-1 block text-sm font-medium">Password</span>
+          <span className="mb-1 flex items-baseline justify-between text-sm font-medium">
+            Password
+            {mode === "signin" && (
+              <Link href="/login/forgot" className="font-normal text-muted underline hover:text-foreground">
+                Forgot password?
+              </Link>
+            )}
+          </span>
           <input
             name="password"
             type="password"

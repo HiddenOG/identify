@@ -8,14 +8,25 @@ import type { ExtractedCv } from "./cv-shape";
 
 type Section = "header" | "summary" | "experience" | "education" | "skills" | "tools" | "other";
 
+// Order matters: the first match wins. Headings have punctuation stripped ("Where I've worked" → "where i ve worked").
 const HEADINGS: [Section, RegExp][] = [
-  ["summary", /^(profile|summary|professional summary|career summary|about|about me|objective|career objective|personal statement)$/],
-  ["experience", /^(experience|work experience|professional experience|relevant experience|employment|employment history|work history|career history)$/],
-  ["education", /^(education|education (and|&) (training|certifications?)|certifications?|certificates|academic background|qualifications|courses)$/],
-  ["skills", /^(skills|technical skills|core skills|key skills|skills (and|&) (abilities|competencies)|competencies|core competencies|expertise)$/],
+  // Personal details and sidebars ("Contact") belong with the name at the top.
+  ["header", /^(personal (data|details|information|profile)|contact|contacts|contact (details|information|me))$/],
+  ["summary", /^(profile|summary|professional (summary|profile)|career (summary|profile|objective)|about|about me|objective|personal statement)$/],
+  ["other", /^(volunteer(ing)?( experience)?)$/],
+  ["experience", /^(([a-z]+ ){0,2}experience|employment( history)?|work history|career history|where i (ve|have) worked|work)$/],
+  ["education", /^(education(al)?( (and|&) (training|certifications?))?|educational (qualifications|background)|academic (background|qualifications)|certifications?|certificates|qualifications|courses|what i studied|studies)$/],
+  ["skills", /^(skills|(technical|core|key|professional|soft) skills|skills (and|&) (abilities|competencies)|competencies|core competencies|expertise|what i know|what i do)$/],
   ["tools", /^(tools|tools (and|&) technologies|technologies|tech stack|technical stack|languages (and|&) tools|software)$/],
-  ["other", /^(projects|personal projects|interests|hobbies|references|languages|awards|achievements|honou?rs|publications|volunteering|volunteer experience|activities|leadership|links in document)$/],
+  ["other", /^(projects|personal projects|interests|hobbies|references|referees|languages|awards|achievements|honou?rs|publications|activities|leadership|links in document)$/],
 ];
+
+/** A document title, not the person's name. */
+const DOC_TITLE = /^(curriculum vitae|resume|résumé|cv)$/i;
+/** "Name: Emeka Nwosu" in a personal-data block. */
+const NAME_FIELD = /^(?:full\s+)?name\s*[:\-–]\s*(.+)$/i;
+/** "Date of Birth: …", "State of Origin: …": labelled fields that aren't a headline. */
+const FIELD = /^[\p{L} ]{2,25}:\s/u;
 
 const MONTH = "(?:jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*\\.?";
 const POINT = `(?:${MONTH}\\s+)?(?:(?:0?[1-9]|1[0-2])\\/)?(?:19|20)\\d{2}`;
@@ -108,6 +119,19 @@ function parseExperience(rawLines: string[]): ExtractedCv["experience"] {
   const anchors = lines.map((l, i) => (DATE_RANGE.test(l) ? i : -1)).filter((i) => i >= 0);
   if (!anchors.length) return [];
 
+  // Some CVs put the dates first, then the title underneath: "06/2021 - Present" / "DevOps Engineer, Monzo".
+  const dateOnly = (i: number) => !trimSeparators(lines[i].replace(DATE_RANGE, ""));
+  if (anchors[0] === 0 && dateOnly(0)) {
+    return anchors.map((a, k) => {
+      const date = lines[a].match(DATE_RANGE)!;
+      const end = k + 1 < anchors.length ? anchors[k + 1] : lines.length;
+      const hasTitle = a + 1 < end && isTitleLike(lines[a + 1]);
+      const job = splitTitle(hasTitle ? lines[a + 1] : "");
+      const highlights = mergeWrapped(lines.slice(hasTitle ? a + 2 : a + 1, end)).map((h) => h.replace(BULLET, ""));
+      return { ...job, period: `${date[1]} - ${date[2]}`, highlights };
+    });
+  }
+
   const titleStart: number[] = anchors.map((a, k) => {
     const floor = k === 0 ? 0 : anchors[k - 1] + 1;
     const rest = trimSeparators(lines[a].replace(DATE_RANGE, ""));
@@ -176,7 +200,14 @@ export function ruleParseCv(text: string): ExtractedCv {
 
   // Contact details can be anywhere (often in a sidebar or footer).
   const email = text.match(EMAIL)?.[0] ?? "";
-  const phone = (text.replace(EMAIL, "").match(PHONE)?.[1] ?? "").trim();
+  // A real number has 9–15 digits; that also rules out date ranges like "2018 - 2020".
+  const phone =
+    [...text.replace(EMAIL, "").matchAll(new RegExp(PHONE, "g"))]
+      .map((m) => m[1].trim())
+      .find((p) => {
+        const digits = p.replace(/\D/g, "").length;
+        return digits >= 9 && digits <= 15 && !DATE_RANGE.test(p);
+      }) ?? "";
   const urls = [...text.matchAll(URL)].map((m) => m[1]).filter((u) => !u.includes("@") && !/\.(pdf|docx?)$/i.test(u));
   const linkedin = urls.find((u) => /linkedin\.com\/in\//i.test(u)) ?? "";
   const github = urls.find((u) => /github\.com\/[\w-]+/i.test(u)) ?? "";
@@ -184,12 +215,25 @@ export function ruleParseCv(text: string): ExtractedCv {
 
   // Name and headline: the first plain lines of the header that aren't contact info.
   const headerLines = sections.header.filter(
-    (l) => l && !EMAIL.test(l) && !/\d{5,}/.test(l.replace(/\s/g, "")) && !/https?:|www\.|linkedin|github/i.test(l),
+    (l) => l && !EMAIL.test(l) && !/\d{5,}/.test(l.replace(/\s/g, "")) && !/https?:|www\.|linkedin|github/i.test(l) && !DOC_TITLE.test(l),
   );
-  const nameLine = headerLines.find((l) => /^[\p{L}'.-]+(\s+[\p{L}'.-]+){1,4}$/u.test(l)) ?? headerLines[0] ?? "";
-  const afterName = headerLines.slice(headerLines.indexOf(nameLine) + 1);
-  const location = afterName.find((l) => /^[\p{L}\s.-]+,\s*[\p{L}\s.-]+$/u.test(l) && l.length < 60) ?? "";
-  const headline = afterName.find((l) => l !== location && l.length <= 120 && !/[.!?]$/.test(l)) ?? "";
+  const isName = (l: string) => /^[\p{L}'.-]+(\s+[\p{L}'.-]+){1,4}$/u.test(l) && !DOC_TITLE.test(l);
+  const fieldName = sections.header.map((l) => l.match(NAME_FIELD)?.[1]?.trim()).find(Boolean);
+  // Two-column PDFs often emit the sidebar (with the name) after the main column, so as a last
+  // resort find a line made of the words in the email address: tunde.bakare@… → "Tunde Bakare".
+  const emailWords = (email.split("@")[0] ?? "").toLowerCase().split(/[._-]+/).filter((w) => /^[a-z]{2,}$/.test(w));
+  const lineFromEmail =
+    emailWords.length >= 2 ? lines.find((l) => isName(l) && emailWords.every((w) => l.toLowerCase().includes(w))) : undefined;
+  const nameLine =
+    fieldName ?? headerLines.find(isName) ?? lineFromEmail ?? headerLines.find((l) => !FIELD.test(l)) ?? "";
+  const nameIndex = headerLines.indexOf(nameLine);
+  const afterName = (nameIndex >= 0 ? headerLines.slice(nameIndex + 1) : headerLines).filter((l) => !FIELD.test(l));
+  const looksLikePlace = (l: string) => /^[\p{L}\s.'-]{2,30},\s*[\p{L}\s.'-]{2,30}$/u.test(l) && !/\.$/.test(l);
+  const location = afterName.find(looksLikePlace) ?? "";
+  const headline =
+    afterName.find((l) => l !== location && l.length <= 120 && !/[.!?]$/.test(l)) ??
+    // Name found outside the header (sidebar): the line right after it is usually the headline.
+    (lineFromEmail && nameLine === lineFromEmail ? lines[lines.indexOf(nameLine) + 1] ?? "" : "");
   // Some CVs open with a paragraph instead of a "Summary" heading.
   const leadParagraph = afterName.filter((l) => l.length > 120).join(" ");
 
@@ -208,7 +252,8 @@ export function ruleParseCv(text: string): ExtractedCv {
     skills,
     tools: explicitTools.length ? explicitTools : detectedTools,
     experience: parseExperience(sections.experience),
-    education: parseEducation(sections.education),
+    // Sidebar text that spilled into the last section starts with the person's name; drop it.
+    education: parseEducation(sections.education).filter((e) => !(nameLine && e.title.startsWith(nameLine))),
     links: { email, phone, linkedin, github, website },
   };
 }

@@ -51,6 +51,24 @@ Without Supabase keys the app still runs: `/preview/classic` shows the CV templa
    `https://<your-domain>/auth/callback` to Redirect URLs (keep the localhost ones for development).
 4. Use Node.js 22 (Vercel: Project Settings → Build and Deployment → Node.js Version); Supabase is dropping Node 20.
 
+## Emails
+
+Auth emails are sent by Supabase through Resend (Authentication → Emails → SMTP Settings: host `smtp.resend.com`,
+port `465`, user `resend`, password = Resend API key, sender `hello@identify.com.im`). The domain's DNS records are
+in Namecheap; replies to hello@ are forwarded to the team Gmail.
+
+The branded templates live in `supabase/templates/`. Paste each into **Authentication → Emails → Templates**:
+
+| Supabase template | File | Subject |
+|---|---|---|
+| Confirm sign up | `confirm-signup.html` | Confirm your email for Identify |
+| Reset password | `reset-password.html` | Reset your Identify password |
+| Change email address | `change-email.html` | Confirm your new email for Identify |
+| Magic link | `magic-link.html` | Your Identify sign-in link |
+
+Their links go to `/auth/confirm?token_hash=…`, which works on any device (unlike `/auth/callback`, which needs the
+browser that started sign-in). The logo is `public/email/logo.png`, loaded from the live site.
+
 ## Project layout
 
 ```

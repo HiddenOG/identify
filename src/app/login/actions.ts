@@ -77,3 +77,36 @@ export async function signInWithProvider(formData: FormData) {
   }
   redirect(data.url);
 }
+
+/** "Forgot password?": emails a reset link. Says the same thing either way, so it doesn't reveal who has an account. */
+export async function requestPasswordReset(_: AuthState, formData: FormData): Promise<AuthState> {
+  const parsed = credentials.pick({ email: true }).safeParse(Object.fromEntries(formData));
+  if (!parsed.success) return { error: parsed.error.issues[0].message };
+
+  const supabase = await createClient();
+  const { error } = await supabase.auth.resetPasswordForEmail(parsed.data.email, {
+    redirectTo: `${await origin()}/auth/callback?next=/reset-password`,
+  });
+  // Too many requests is worth saying; anything else would hint whether the account exists.
+  if (error?.status === 429) return { error: "Too many requests. Wait a minute and try again." };
+  if (error) console.error("[requestPasswordReset]", error.message);
+  return { message: "If there's an account for that email, a reset link is on its way. Check your inbox (and spam)." };
+}
+
+const newPassword = z
+  .object({ password: credentials.shape.password, confirm: z.string() })
+  .refine((v) => v.password === v.confirm, { message: "The passwords don't match.", path: ["confirm"] });
+
+/** Sets the new password for someone who arrived through a reset link (they're signed in by then). */
+export async function setNewPassword(_: AuthState, formData: FormData): Promise<AuthState> {
+  const parsed = newPassword.safeParse(Object.fromEntries(formData));
+  if (!parsed.success) return { error: parsed.error.issues[0].message };
+
+  const supabase = await createClient();
+  const { data } = await supabase.auth.getClaims();
+  if (!data?.claims) return { error: "That reset link has expired. Request a new one." };
+
+  const { error } = await supabase.auth.updateUser({ password: parsed.data.password });
+  if (error) return { error: error.code === "same_password" ? "That's your current password. Pick a new one." : error.message };
+  redirect("/?password=updated");
+}

@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test:cv": "npx tsx tests/cv-import/run.mts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^1.3.0",

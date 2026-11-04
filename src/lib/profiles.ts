@@ -8,7 +8,7 @@ type Supabase = SupabaseClient;
 export const RESERVED_USERNAMES = new Set([
   "login", "signup", "logout", "auth", "onboarding", "settings", "new", "preview",
   "explore", "search", "tags", "api", "admin", "about", "help", "terms", "privacy",
-  "people", "notifications", "following", "library", "stories", "stats", "topics", "messages", "discover",
+  "people", "notifications", "following", "library", "stories", "stats", "topics", "messages", "discover", "reset-password",
 ]);
 
 export const PROFILES_TAG = "profiles";
