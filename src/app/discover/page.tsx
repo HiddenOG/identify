@@ -84,7 +84,7 @@ export default async function DiscoverPage() {
         <>
           <section className="mb-14">
             <h2 className="mb-4 text-xl font-bold">Featured</h2>
-            <PortfolioBento portfolios={featured} />
+            <PortfolioBento portfolios={featured} priority />
           </section>
 
           <section>

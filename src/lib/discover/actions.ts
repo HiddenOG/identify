@@ -6,7 +6,8 @@ import { getCurrentUser } from "@/lib/profiles";
 import { createClient } from "@/lib/supabase/server";
 import { isPortfolioCategory } from "./categories";
 import { claimCode, getPortfolio, isAdmin, PORTFOLIOS_TAG } from "./portfolios";
-import { normalizeUrl, readSitePreview, SiteError, siteContainsCode, type SitePreview } from "./site";
+import { fetchImage, normalizeUrl, readSitePreview, SiteError, siteContainsCode, type SitePreview } from "./site";
+import { supabaseUrl } from "@/lib/supabase/env";
 
 /** What every form on Discover gets back: a message to show, or an error. */
 export type ActionState = { message?: string; error?: string } | null;
@@ -26,6 +27,28 @@ function text(formData: FormData, key: string) {
 function changed() {
   updateTag(PORTFOLIOS_TAG);
   refresh();
+}
+
+const isStored = (url: string) => Boolean(supabaseUrl) && url.startsWith(`${supabaseUrl}/storage/v1/object/public/`);
+
+/**
+ * Keeps our own copy of a listing's sharing image, so cards load a small, resized WebP from our
+ * storage instead of a 1–2 MB original from someone else's (sometimes slow) server. Falls back
+ * to the original URL if the copy fails. Stored under the admin's folder (storage policies).
+ */
+async function storeImage(supabase: Supabase, src: string | null) {
+  if (!src || isStored(src)) return src;
+  const { data } = await supabase.auth.getClaims();
+  const userId = data?.claims?.sub;
+  const image = userId ? await fetchImage(src) : null;
+  if (!userId || !image) return src;
+  const path = `${userId}/discover/${crypto.randomUUID()}.${image.ext}`;
+  const { error } = await supabase.storage.from("project-images").upload(path, image.bytes, { contentType: image.type });
+  if (error) {
+    console.error("[discover.storeImage]", error.message);
+    return src;
+  }
+  return supabase.storage.from("project-images").getPublicUrl(path).data.publicUrl;
 }
 
 // ---------- Admin ----------
@@ -71,7 +94,7 @@ export async function savePortfolio(_: ActionState, formData: FormData): Promise
   const { email, ...fields } = parsed.data;
   const id = text(formData, "id");
   const featured = formData.get("featured") === "on";
-  const row = { ...fields, url, featured };
+  const row = { ...fields, image_url: await storeImage(supabase, fields.image_url), url, featured };
 
   const { data, error } = id
     ? await supabase.from("portfolios").update(row).eq("id", id).select("id").single()
@@ -100,11 +123,43 @@ export async function setPortfolioStatus(_: ActionState, formData: FormData): Pr
   const status = text(formData, "status");
   if (!["listed", "removed"].includes(status)) return { error: "Unknown status." };
 
-  const update = status === "listed" ? { status, listed_at: new Date().toISOString() } : { status, featured: false, claimed_by: null };
-  const { error } = await supabase.from("portfolios").update(update).eq("id", text(formData, "id"));
+  const id = text(formData, "id");
+  let update: Record<string, unknown> = { status, featured: false, claimed_by: null };
+  if (status === "listed") {
+    // Approving a member's suggestion: take our own copy of its image too.
+    const { data: current } = await supabase.from("portfolios").select("image_url").eq("id", id).maybeSingle<{ image_url: string | null }>();
+    update = { status, listed_at: new Date().toISOString(), image_url: await storeImage(supabase, current?.image_url ?? null) };
+  }
+  const { error } = await supabase.from("portfolios").update(update).eq("id", id);
   if (error) return { error: error.message };
   changed();
   return { message: status === "listed" ? "Listed." : "Removed." };
+}
+
+/** Copies the images of listings saved before images were stored here (one click on the admin page). */
+export async function storeAllImages(): Promise<ActionState> {
+  const supabase = await adminClient();
+  if (!supabase) return { error: "Admins only." };
+  const { data } = await supabase
+    .from("portfolios")
+    .select("id, image_url")
+    .in("status", ["listed", "claimed", "pending"])
+    .not("image_url", "is", null)
+    .returns<{ id: string; image_url: string }[]>();
+  const todo = (data ?? []).filter((p) => !isStored(p.image_url));
+  let done = 0;
+  for (const p of todo) {
+    const stored = await storeImage(supabase, p.image_url);
+    if (stored && stored !== p.image_url) {
+      const { error } = await supabase.from("portfolios").update({ image_url: stored }).eq("id", p.id);
+      if (!error) done++;
+    }
+  }
+  changed();
+  const failed = todo.length - done;
+  return failed
+    ? { error: `Sped up ${done} of ${todo.length}. ${failed} couldn't be copied (their site blocked it); they still load from the original.` }
+    : { message: `Sped up ${done} image${done === 1 ? "" : "s"}.` };
 }
 
 export async function toggleFeatured(_: ActionState, formData: FormData): Promise<ActionState> {

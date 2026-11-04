@@ -69,8 +69,8 @@ async function assertPublicHost(url: URL) {
   if (addresses.some(({ address }) => isPrivateAddress(address))) throw new SiteError("That site can't be reached.");
 }
 
-/** GET with every redirect hop checked, a timeout and a size cap. Returns the final URL and text. */
-async function fetchText(start: string) {
+/** GET with every redirect hop checked and a timeout. Returns the final response and its URL. */
+async function safeFetch(start: string, accept: string) {
   let url = new URL(start);
   for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
     await assertPublicHost(url);
@@ -78,29 +78,56 @@ async function fetchText(start: string) {
       redirect: "manual",
       cache: "no-store",
       signal: AbortSignal.timeout(TIMEOUT_MS),
-      headers: { "user-agent": USER_AGENT, accept: "text/html,text/plain;q=0.9,*/*;q=0.5" },
+      headers: { "user-agent": USER_AGENT, accept },
     });
     const next = res.headers.get("location");
     if (res.status >= 300 && res.status < 400 && next) {
       url = new URL(next, url);
       continue;
     }
-    if (!res.body) return { url: url.toString(), status: res.status, text: "" };
-
-    const reader = res.body.getReader();
-    const chunks: Uint8Array[] = [];
-    let size = 0;
-    while (size < MAX_BYTES) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      chunks.push(value);
-      size += value.byteLength;
-    }
-    await reader.cancel().catch(() => {});
-    const text = new TextDecoder().decode(Buffer.concat(chunks).subarray(0, MAX_BYTES));
-    return { url: url.toString(), status: res.status, text };
+    return { res, url };
   }
   throw new SiteError("That site redirects too many times.");
+}
+
+/** Reads at most `max` bytes of a body; returns null if it's bigger (unless `truncate`). */
+async function readCapped(res: Response, max: number, truncate: boolean) {
+  if (!res.body) return new Uint8Array();
+  const reader = res.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  while (size <= max) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    chunks.push(value);
+    size += value.byteLength;
+  }
+  await reader.cancel().catch(() => {});
+  if (size > max && !truncate) return null;
+  return new Uint8Array(Buffer.concat(chunks).subarray(0, max));
+}
+
+/** A page's HTML (size-capped), its final URL and status. */
+async function fetchText(start: string) {
+  const { res, url } = await safeFetch(start, "text/html,text/plain;q=0.9,*/*;q=0.5");
+  const bytes = (await readCapped(res, MAX_BYTES, true)) ?? new Uint8Array();
+  return { url: url.toString(), status: res.status, text: new TextDecoder().decode(bytes) };
+}
+
+const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
+const IMAGE_TYPES: Record<string, string> = { "image/png": "png", "image/jpeg": "jpg", "image/webp": "webp", "image/gif": "gif" };
+
+/** A preview image (PNG, JPEG, WebP or GIF up to 8 MB), or null if it can't be fetched. */
+export async function fetchImage(src: string) {
+  try {
+    const { res } = await safeFetch(src, "image/webp,image/png,image/jpeg,image/*;q=0.8");
+    const type = (res.headers.get("content-type") ?? "").split(";")[0].trim().toLowerCase();
+    if (!res.ok || !IMAGE_TYPES[type]) return null;
+    const bytes = await readCapped(res, MAX_IMAGE_BYTES, false);
+    return bytes && bytes.byteLength > 0 ? { bytes, type, ext: IMAGE_TYPES[type] } : null;
+  } catch {
+    return null;
+  }
 }
 
 /** Whether robots.txt lets IdentifyBot (or every bot) read `url`. A missing robots.txt allows it. */

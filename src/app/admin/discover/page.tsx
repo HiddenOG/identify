@@ -5,13 +5,13 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ActionForm } from "@/components/action-form";
 import { SiteImage } from "@/components/discover/site-image";
-import { approveClaim, markInvited, rejectClaim, setPortfolioStatus, toggleFeatured } from "@/lib/discover/actions";
+import { approveClaim, markInvited, rejectClaim, setPortfolioStatus, storeAllImages, toggleFeatured } from "@/lib/discover/actions";
 import { categoryInfo } from "@/lib/discover/categories";
 import { isAdmin, type Portfolio } from "@/lib/discover/portfolios";
 import { displayHost } from "@/lib/discover/site";
 import { getCurrentUser } from "@/lib/profiles";
 import { SITE_NAME } from "@/lib/site";
-import { hasSupabaseEnv } from "@/lib/supabase/env";
+import { hasSupabaseEnv, supabaseUrl } from "@/lib/supabase/env";
 import { createClient } from "@/lib/supabase/server";
 import { formatDate } from "@/lib/projects";
 import { PortfolioForm } from "@/components/discover/portfolio-form";
@@ -61,9 +61,25 @@ async function Admin() {
   const pending = all.filter((p) => p.status === "pending");
   const live = all.filter((p) => p.status === "listed" || p.status === "claimed");
   const signature = profile?.full_name || SITE_NAME;
+  const storagePrefix = `${supabaseUrl}/storage/v1/object/public/`;
+  const slowImages = all.filter((p) => p.status !== "removed" && p.image_url && !p.image_url.startsWith(storagePrefix)).length;
 
   return (
     <div className="mt-8 space-y-14">
+      {slowImages > 0 && (
+        <section className="rounded-xl border border-line bg-surface p-4 text-sm">
+          <p className="mb-3">
+            {slowImages} listing{slowImages === 1 ? "" : "s"} still load{slowImages === 1 ? "s" : ""} the preview image from the
+            person&apos;s own site, which can be slow. Copy them here so they load fast, resized for each screen.
+          </p>
+          <ActionForm action={storeAllImages}>
+            <button className="rounded-full bg-foreground px-4 py-1.5 text-background hover:opacity-90 disabled:opacity-60">
+              Speed up images
+            </button>
+          </ActionForm>
+        </section>
+      )}
+
       <section>
         <h2 className="mb-1 text-xl font-bold">Add a portfolio</h2>
         <p className="mb-4 text-sm text-muted">
