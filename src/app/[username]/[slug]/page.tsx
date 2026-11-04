@@ -19,7 +19,7 @@ import { RemoteImage } from "@/components/remote-image";
 import { publishProject } from "@/lib/project-actions";
 import { SITE_NAME } from "@/lib/site";
 import { getCurrentUser } from "@/lib/profiles";
-import { formatDate, getProject, readingMinutes } from "@/lib/projects";
+import { formatDate, getProject, previewMarkdown, readingMinutes } from "@/lib/projects";
 import { getComments, hasLiked } from "@/lib/social";
 import { hasSupabaseEnv } from "@/lib/supabase/env";
 import { createPublicClient } from "@/lib/supabase/public";
@@ -67,6 +67,8 @@ async function Project({ params }: Pick<PageProps<"/[username]/[slug]">, "params
   const isOwner = userId === project.author_id;
   const authorName = project.author.full_name || project.author.username;
   const loginHref = `/login?next=${encodeURIComponent(`/${username}/${slug}`)}`;
+  // Like Medium: signed-out readers get the opening, then sign in to read the rest.
+  const { text: body, cut: gated } = userId ? { text: project.body_md, cut: false } : previewMarkdown(project.body_md);
   const likeButton = (
     <LikeButton
       projectId={project.id}
@@ -170,11 +172,16 @@ async function Project({ params }: Pick<PageProps<"/[username]/[slug]">, "params
         <RemoteImage src={project.cover_url} sizes="(max-width: 768px) 100vw, 728px" priority className="mt-8 h-auto w-full rounded-lg" />
       )}
 
-      <div className="mt-10">
-        <Markdown>{project.body_md}</Markdown>
+      <div className={`mt-10 ${gated ? "relative max-h-[28rem] overflow-hidden" : ""}`}>
+        <Markdown>{body}</Markdown>
+        {gated && <div className="pointer-events-none absolute inset-x-0 bottom-0 h-40 bg-linear-to-b from-transparent to-background" />}
       </div>
-      {/* Reaching this point counts as a read in the author's Stats. */}
-      <span id="read-end" aria-hidden />
+      {gated ? (
+        <ReadGate authorName={authorName} next={`/${username}/${slug}`} responses={comments.length} />
+      ) : (
+        // Reaching this point counts as a read in the author's Stats.
+        <span id="read-end" aria-hidden />
+      )}
       {project.status === "published" && !isOwner && <TrackView projectId={project.id} endMarkerId="read-end" />}
 
       {project.tags.length > 0 && (
@@ -187,7 +194,7 @@ async function Project({ params }: Pick<PageProps<"/[username]/[slug]">, "params
         </ul>
       )}
 
-      {project.status === "published" && (
+      {project.status === "published" && !gated && (
         <div className="mt-8 flex items-center gap-6 px-1">
           {likeButton}
           <a href="#responses" className="flex items-center gap-1.5 text-sm text-muted hover:text-foreground" title="Responses">
@@ -232,7 +239,7 @@ async function Project({ params }: Pick<PageProps<"/[username]/[slug]">, "params
         </div>
       </div>
 
-      {project.status === "published" && (
+      {project.status === "published" && !gated && (
         <Comments
           projectId={project.id}
           projectOwnerId={project.author_id}
@@ -242,5 +249,27 @@ async function Project({ params }: Pick<PageProps<"/[username]/[slug]">, "params
         />
       )}
     </article>
+  );
+}
+
+/** Where the preview ends for signed-out readers: sign in (or join) to read the rest. */
+function ReadGate({ authorName, next, responses }: { authorName: string; next: string; responses: number }) {
+  const back = encodeURIComponent(next);
+  return (
+    <div className="relative mt-2 rounded-2xl border border-line px-6 py-10 text-center">
+      <h2 className="font-serif text-2xl font-bold sm:text-3xl">Sign in to keep reading</h2>
+      <p className="mx-auto mt-3 max-w-md text-muted">
+        Read the rest of {authorName}&apos;s write-up{responses > 0 ? ` and ${responses} ${responses === 1 ? "response" : "responses"}` : ""}. It&apos;s
+        free, and you get your own CV website too.
+      </p>
+      <div className="mt-6 flex flex-wrap justify-center gap-3">
+        <Link href={`/login?mode=signup&next=${back}`} className="rounded-full bg-foreground px-6 py-2.5 text-background hover:opacity-90">
+          Create a free account
+        </Link>
+        <Link href={`/login?next=${back}`} className="rounded-full border border-foreground px-6 py-2.5 hover:bg-surface">
+          Sign in
+        </Link>
+      </div>
+    </div>
   );
 }

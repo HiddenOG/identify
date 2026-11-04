@@ -74,6 +74,45 @@ export function readingMinutes(markdown: string) {
   return Math.max(1, Math.round(markdown.split(/\s+/).filter(Boolean).length / 220));
 }
 
+/** How much of a write-up signed-out readers see before "sign in to keep reading". */
+const PREVIEW_CHARS = 700;
+
+/**
+ * The opening of a write-up for signed-out readers, cut at a block boundary (never inside a
+ * fenced code block) so the Markdown still renders cleanly. `cut` is false when the whole thing
+ * is short enough to show. Done on the server, so the rest never reaches the browser.
+ */
+export function previewMarkdown(markdown: string): { text: string; cut: boolean } {
+  const blocks: string[] = [];
+  let current: string[] = [];
+  let inFence = false;
+  for (const line of markdown.split("\n")) {
+    if (/^\s*(```|~~~)/.test(line)) inFence = !inFence;
+    if (!inFence && line.trim() === "" && current.length) {
+      blocks.push(current.join("\n"));
+      current = [];
+    } else if (line.trim() !== "" || inFence) {
+      current.push(line);
+    }
+  }
+  if (current.length) blocks.push(current.join("\n"));
+
+  // About the first 40%, at most PREVIEW_CHARS, so short write-ups are gated too.
+  const total = blocks.reduce((n, b) => n + b.length, 0);
+  const limit = Math.min(PREVIEW_CHARS, Math.floor(total * 0.4));
+  const kept: string[] = [];
+  let size = 0;
+  for (const block of blocks) {
+    // Always keep at least one block; stop once there's enough to get a feel for it.
+    if (kept.length && size + block.length > limit) break;
+    kept.push(block);
+    size += block.length;
+    if (size >= limit) break;
+  }
+  const cut = kept.length < blocks.length;
+  return { text: kept.join("\n\n"), cut };
+}
+
 export function formatDate(iso: string | null) {
   if (!iso) return "";
   return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
