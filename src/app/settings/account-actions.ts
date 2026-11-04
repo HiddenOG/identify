@@ -90,6 +90,29 @@ export async function signOutEverywhere() {
 }
 
 /** Removes the user's uploaded files, then the account (the database cascades the rest). */
+/**
+ * Deletes everything under `prefix` in a bucket, including sub-folders (e.g. an admin's
+ * `discover/` image copies). Storage lists folders as entries with no id. Returns an error message
+ * or null. Pages of 100, capped, so a storage hiccup can't loop forever.
+ */
+async function removeFolder(supabase: Awaited<ReturnType<typeof createClient>>, bucket: string, prefix: string, depth = 0): Promise<string | null> {
+  if (depth > 3) return null;
+  for (let page = 0; page < 50; page++) {
+    const { data: entries, error: listError } = await supabase.storage.from(bucket).list(prefix, { limit: 100 });
+    if (listError) return listError.message;
+    if (!entries?.length) return null;
+    const files = entries.filter((e) => e.id).map((e) => `${prefix}/${e.name}`);
+    for (const folder of entries.filter((e) => !e.id)) {
+      const error = await removeFolder(supabase, bucket, `${prefix}/${folder.name}`, depth + 1);
+      if (error) return error;
+    }
+    if (!files.length) return null; // only (now empty) folders were left
+    const { error } = await supabase.storage.from(bucket).remove(files);
+    if (error) return error.message;
+  }
+  return null;
+}
+
 export async function deleteAccount(_: AccountState, formData: FormData): Promise<AccountState> {
   const { supabase, userId } = await session();
   if (!userId) return { error: "Your session expired. Sign in again." };
@@ -99,13 +122,8 @@ export async function deleteAccount(_: AccountState, formData: FormData): Promis
   if (!profile?.username || typed !== profile.username) return { error: `Type ${profile?.username ?? "your username"} to confirm.` };
 
   for (const bucket of ["avatars", "project-images"]) {
-    // Pages of 100; capped so a storage hiccup can't loop forever.
-    for (let page = 0; page < 50; page++) {
-      const { data: files } = await supabase.storage.from(bucket).list(userId, { limit: 100 });
-      if (!files?.length) break;
-      const { error } = await supabase.storage.from(bucket).remove(files.map((f) => `${userId}/${f.name}`));
-      if (error) return { error: `Couldn't remove your files: ${error.message}` };
-    }
+    const error = await removeFolder(supabase, bucket, userId);
+    if (error) return { error: `Couldn't remove your files: ${error}` };
   }
 
   const { error } = await supabase.rpc("delete_own_account");
