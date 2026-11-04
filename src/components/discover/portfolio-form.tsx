@@ -52,6 +52,7 @@ export function PortfolioForm({ initial, mode = "admin" }: { initial?: Portfolio
         name: v.name || preview.name,
         description: v.description || preview.description,
         image_url: v.image_url || preview.imageUrl,
+        email: v.email || preview.email,
       }));
     });
   }

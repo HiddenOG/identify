@@ -237,6 +237,11 @@ function PortfolioList({
                   </ActionForm>
                 </>
               )}
+              {p.status === "listed" && !contact?.email && !contact?.do_not_contact && (
+                <span className="self-center text-xs text-muted">
+                  No email yet: add one in Edit details (or press Read site there) to send an invite.
+                </span>
+              )}
               <ActionForm action={setPortfolioStatus} fields={{ id: p.id, status: "removed" }}>
                 <button className={`${small} text-danger`}>{p.status === "pending" ? "Reject" : "Remove"}</button>
               </ActionForm>

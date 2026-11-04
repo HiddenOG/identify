@@ -55,10 +55,13 @@ async function storeImage(supabase: Supabase, src: string | null) {
 
 /** Reads a site's sharing details to pre-fill the add/suggest form. Signed-in members only. */
 export async function previewSite(url: string): Promise<{ preview?: SitePreview; error?: string }> {
-  const { profile } = await getCurrentUser(await createClient());
+  const supabase = await createClient();
+  const { profile } = await getCurrentUser(supabase);
   if (!profile) return { error: "Sign in first." };
   try {
-    return { preview: await readSitePreview(url) };
+    const preview = await readSitePreview(url);
+    // Contact emails are for admins only (they're never shown publicly).
+    return { preview: (await isAdmin(supabase)) ? preview : { ...preview, email: "" } };
   } catch (error) {
     if (error instanceof SiteError) return { error: error.message };
     console.error("[discover.previewSite]", error);

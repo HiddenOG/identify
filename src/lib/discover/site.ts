@@ -215,7 +215,27 @@ export type SitePreview = {
   name: string;
   description: string;
   imageUrl: string;
+  /** An address the site publishes for contact (a mailto: link), or "". */
+  email: string;
 };
+
+/**
+ * The email a site publishes for contact: the first mailto: link that isn't an obvious
+ * placeholder or a no-reply address. Only explicit mailto: links count, not any text that looks
+ * like an email, so it's an address the person chose to publish.
+ */
+export function publishedEmail(html: string) {
+  for (const [, raw] of html.matchAll(/href\s*=\s*["']mailto:([^"'?#]+)/gi)) {
+    let email: string;
+    try {
+      email = decodeEntities(decodeURIComponent(raw)).trim().toLowerCase();
+    } catch {
+      continue; // badly encoded link
+    }
+    if (/^[^\s@]+@[^\s@]+\.[a-z]{2,}$/.test(email) && !/example\.|yourname|your@|email@|noreply|no-reply/.test(email)) return email;
+  }
+  return "";
+}
 
 /** The preview details a site publishes for sharing. Throws SiteError if it can't or mustn't be read. */
 export async function readSitePreview(input: string): Promise<SitePreview> {
@@ -244,7 +264,7 @@ export async function readSitePreview(input: string): Promise<SitePreview> {
     if (resolved && ["http:", "https:"].includes(resolved.protocol)) imageUrl = resolved.toString();
   } catch {}
 
-  return { url, name: name || displayHost(url), description, imageUrl };
+  return { url, name: name || displayHost(url), description, imageUrl, email: publishedEmail(page.text) };
 }
 
 /** True when the site's home page contains `code` (in a meta tag or anywhere in the HTML). */
