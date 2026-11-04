@@ -33,7 +33,7 @@ async function Inbox({ searchParams }: Pick<PageProps<"/messages">, "searchParam
   const conversations = await getConversations(supabase, me);
 
   return (
-    <div className="grid h-full overflow-hidden md:grid-cols-[340px_1fr] md:rounded-lg md:border md:border-line">
+    <div className="grid h-full grid-cols-[minmax(0,1fr)] overflow-hidden md:grid-cols-[340px_minmax(0,1fr)] md:rounded-lg md:border md:border-line">
       <section className="min-h-0 overflow-y-auto md:border-r md:border-line">
         <h1 className="border-b border-line px-5 py-4 text-xl font-bold tracking-tight">Messages</h1>
         {typeof error === "string" && <p className="border-b border-line px-5 py-3 text-sm text-danger">{error}</p>}

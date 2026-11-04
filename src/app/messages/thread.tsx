@@ -94,9 +94,9 @@ export function Thread({ conversationId, me, other, initial }: Props) {
   };
 
   return (
-    <div className="flex h-full min-h-0 flex-col">
-      <header className="flex items-center gap-3 border-b border-line px-5 py-3">
-        <Link href="/messages" className="text-muted hover:text-foreground md:hidden" aria-label="Back to messages">
+    <div className="flex h-full min-h-0 min-w-0 flex-col">
+      <header className="flex items-center gap-3 border-b border-line px-3 py-3 sm:px-5">
+        <Link href="/messages" className="-ml-2 grid size-9 shrink-0 place-items-center text-lg text-muted hover:text-foreground md:hidden" aria-label="Back to messages">
           ←
         </Link>
         <Link href={`/${other.username}`} className="flex min-w-0 items-center gap-3 hover:underline">
@@ -156,7 +156,7 @@ export function Thread({ conversationId, me, other, initial }: Props) {
             maxLength={4000}
             placeholder={`Message ${name}`}
             aria-label={`Message ${name}`}
-            className="max-h-40 min-h-6 flex-1 resize-none bg-transparent py-1 outline-none [field-sizing:content]"
+            className="max-h-40 min-h-6 min-w-0 flex-1 resize-none bg-transparent py-1 outline-none [field-sizing:content]"
           />
           <button
             disabled={!draft.trim() || sending}
@@ -165,7 +165,7 @@ export function Thread({ conversationId, me, other, initial }: Props) {
             Send
           </button>
         </div>
-        <p className="mt-1 px-2 text-xs text-muted">Enter to send · Shift+Enter for a new line</p>
+        <p className="mt-1 hidden px-2 text-xs text-muted md:block">Enter to send · Shift+Enter for a new line</p>
       </form>
     </div>
   );

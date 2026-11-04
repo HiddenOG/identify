@@ -34,7 +34,7 @@ async function Conversation({ params }: Pick<PageProps<"/messages/[id]">, "param
   const [messages, conversations] = await Promise.all([getMessages(supabase, id), getConversations(supabase, me)]);
 
   return (
-    <div className="grid h-full overflow-hidden md:grid-cols-[340px_1fr] md:rounded-lg md:border md:border-line">
+    <div className="grid h-full grid-cols-[minmax(0,1fr)] overflow-hidden md:grid-cols-[340px_minmax(0,1fr)] md:rounded-lg md:border md:border-line">
       {/* Phones show just the thread (with a back arrow); wider screens keep the inbox alongside. */}
       <section className="hidden min-h-0 overflow-y-auto border-r border-line md:block">
         <h2 className="border-b border-line px-5 py-4 text-xl font-bold tracking-tight">Messages</h2>
