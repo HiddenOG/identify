@@ -58,6 +58,7 @@ CV **content** is stored once as structured JSON (`cv_content.data`). A **templa
 - [ ] Owner runs `20261102000000_discover.sql`, makes themselves an admin (README), and adds the first portfolios.
 - [x] Live (2026-11-04): https://identify.com.im (Vercel; www and identify-olive.vercel.app redirect), Google sign-in on, auth emails from hello@identify.com.im via Resend (forwarded to identfai@gmail.com). Branded auth templates in `supabase/templates/` link to `/auth/confirm` (token hash, any device). Added "Forgot password?" (`/login/forgot`) and `/reset-password`, which didn't exist before.
 - [x] CV import test set (2026-11-04): `npm run test:cv` runs 11 CVs in `tests/cv-import/` (two-column, tables, dates-first, creative and Nigerian traditional headings, nurse, DOCX, scanned) through the real upload path and the free rule parser; 60/60. Run it after any rule-parser change. No AI is called.
+- [x] Link previews (2026-11-04): `opengraph-image.tsx` for the site, `/[username]` (name, headline, location, cut-out photo on lime, "Open to work") and `/[username]/[slug]` (title, summary, author, cover). Shared helpers in `lib/og.tsx` (Geist from Google Fonts, PNG/JPEG/GIF only since next/og can't draw WebP, text clipping). `metadataBase` = `SITE_URL` in `lib/site.ts`.
 - [ ] Stage 6b: more CV templates. Waiting on a design (the owner has none yet); every template takes `TemplateProps` and registers in `components/cv/render-template.tsx`, and needs its own print CSS.
 
 ## Owner preferences

@@ -21,9 +21,12 @@ export async function generateMetadata({ params }: PageProps<"/[username]">): Pr
   const profile = await getProfileByUsername(createPublicClient(), username);
   if (!profile) return {};
   const name = profile.view.fullName || profile.view.username;
+  const fallback = [profile.view.headline, profile.view.location].filter(Boolean).join(" · ");
   return {
     title: profile.view.headline ? `${name} — ${profile.view.headline}` : name,
-    description: profile.cv.summary.slice(0, 160) || undefined,
+    description: profile.cv.summary.slice(0, 160) || fallback || `${name}'s CV and projects.`,
+    // The card itself comes from opengraph-image.tsx next to this page.
+    openGraph: { type: "profile", url: `/${profile.view.username}` },
   };
 }
 

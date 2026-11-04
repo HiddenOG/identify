@@ -2,6 +2,9 @@
 export const SITE_NAME = "Identify";
 export const SITE_TAGLINE = "Where builders show their work.";
 
+/** The live address, used for absolute links in link previews. Override with NEXT_PUBLIC_SITE_URL. */
+export const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://identify.com.im";
+
 /** Where people reach the team (About, Privacy, Terms). Leave empty to hide the contact lines. */
 export const CONTACT_EMAIL = "identfai@gmail.com";
 

@@ -33,7 +33,8 @@ export async function generateMetadata({ params }: PageProps<"/[username]/[slug]
   return {
     title: project.title,
     description: project.summary ?? undefined,
-    openGraph: project.cover_url ? { images: [project.cover_url] } : undefined,
+    // The card itself (title, author and cover) comes from opengraph-image.tsx next to this page.
+    openGraph: { type: "article", url: `/${username}/${slug}` },
   };
 }
 
