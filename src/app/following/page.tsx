@@ -72,8 +72,17 @@ async function FollowingContent({ searchParams }: Pick<PageProps<"/following">, 
         <Link href="/following" className={chip(tab === "stories")}>
           Stories
         </Link>
-        <Link href="/following?tab=people" className={chip(tab === "people")}>
-          People you follow{people.length ? ` (${people.length})` : ""}
+        <Link href="/following?tab=people" className={`${chip(tab === "people")} inline-flex items-center gap-2`}>
+          People you follow
+          {people.length > 0 && (
+            <span
+              className={`grid h-5 min-w-5 place-items-center rounded-full px-1.5 text-xs font-semibold ${
+                tab === "people" ? "bg-background text-foreground" : "bg-surface text-foreground"
+              }`}
+            >
+              {people.length}
+            </span>
+          )}
         </Link>
       </div>
       {tab === "people" ? <PeopleTab people={people} userId={userId} /> : <StoriesTab people={people} userId={userId} />}
