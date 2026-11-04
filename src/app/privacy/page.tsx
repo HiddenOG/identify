@@ -72,8 +72,9 @@ export default function PrivacyPage() {
         contact, never shown publicly.
       </p>
       <p>
-        Every unclaimed listing says so and has a Remove link that works without an account: it takes the listing down at once,
-        and we won&apos;t contact that person again. Owners can also claim their listing for free.
+        Every listing its owner hasn&apos;t claimed has an &ldquo;Is this you?&rdquo; link. It leads to a page where the owner can
+        claim the listing for free, or remove it without an account: it comes down at once, and we won&apos;t contact that
+        person again.
       </p>
 
       <h2>Cookies and local storage</h2>

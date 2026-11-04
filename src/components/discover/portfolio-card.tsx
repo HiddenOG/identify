@@ -5,7 +5,11 @@ import { displayHost } from "@/lib/discover/site";
 
 const pill = "rounded-full border px-2 py-0.5 text-[10px] font-semibold tracking-wide uppercase";
 
-/** A portfolio on Discover: the site's preview image, the person behind it, and claim status. */
+/**
+ * A portfolio on Discover: the site's preview image and the person behind it. Claimed listings get
+ * an "On Identify" badge; unclaimed ones keep a quiet "Is this you?" link (the owner invites people
+ * personally, so there's no "Unclaimed" label).
+ */
 export function PortfolioCard({ portfolio, size = "md", priority }: { portfolio: Portfolio; size?: "md" | "lg"; priority?: boolean }) {
   const host = displayHost(portfolio.url);
   const username = portfolio.status === "claimed" ? portfolio.member?.username : null;
@@ -37,11 +41,7 @@ export function PortfolioCard({ portfolio, size = "md", priority }: { portfolio:
         ) : (
           <span className="truncate font-bold">{portfolio.name}</span>
         )}
-        {username ? (
-          <span className={`${pill} border-success text-success`}>On Identify</span>
-        ) : (
-          <span className={`${pill} border-line text-muted`}>Unclaimed</span>
-        )}
+        {username && <span className={`${pill} border-success text-success`}>On Identify</span>}
       </div>
       {meta && <p className="truncate text-sm text-muted">{meta}</p>}
       {!username && (
