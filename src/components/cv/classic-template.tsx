@@ -4,12 +4,20 @@
 import { useEffect, useState, type CSSProperties } from "react";
 import { flushSync } from "react-dom";
 import Link from "next/link";
-import { toolIconUrl } from "@/lib/cv/tool-icons";
+import { toolIconUrls } from "@/lib/cv/tool-icons";
 import { FONT_OPTIONS } from "@/lib/themes";
 import type { TemplateProps } from "./types";
 import s from "./classic.module.css";
 
 type Tab = "info" | "projects";
+
+/** A tool's logo: tries each candidate (devicon, then Simple Icons) and falls back to a dot. */
+function ToolIcon({ name }: { name: string }) {
+  const urls = toolIconUrls(name);
+  const [index, setIndex] = useState(0);
+  if (index >= urls.length) return <span className={s.toolDot} />;
+  return <img src={urls[index]} alt="" className={s.toolIcon} onError={() => setIndex((i) => i + 1)} />;
+}
 
 export function ClassicTemplate({ profile, cv, theme, projects }: TemplateProps) {
   const [tab, setTab] = useState<Tab>("info");
@@ -102,15 +110,12 @@ export function ClassicTemplate({ profile, cv, theme, projects }: TemplateProps)
                 <section className={`${s.section} ${s.container}`}>
                   <h2 className={s.sectionTitle}>Tools &amp; Technologies</h2>
                   <ul className={s.tools}>
-                    {cv.tools.map((tool) => {
-                      const icon = toolIconUrl(tool);
-                      return (
-                        <li key={tool} className={s.tool}>
-                          {icon ? <img src={icon} alt="" className={s.toolIcon} /> : <span className={s.toolDot} />}
-                          <span className={s.toolName}>{tool}</span>
-                        </li>
-                      );
-                    })}
+                    {cv.tools.map((tool) => (
+                      <li key={tool} className={s.tool}>
+                        <ToolIcon name={tool} />
+                        <span className={s.toolName}>{tool}</span>
+                      </li>
+                    ))}
                   </ul>
                 </section>
               )}
