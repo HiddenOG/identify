@@ -1,4 +1,3 @@
-import { createHash } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { PortfolioCategory } from "./categories";
 
@@ -50,16 +49,4 @@ export async function getPortfolio(supabase: SupabaseClient, id: string) {
 export async function isAdmin(supabase: SupabaseClient) {
   const { data } = await supabase.rpc("is_admin");
   return data === true;
-}
-
-/**
- * The code a member puts on their site to prove it's theirs. Anyone can work it out, and that's
- * fine: only the site's owner can publish it there.
- */
-export function claimCode(portfolioId: string, userId: string) {
-  return `identify-verify-${createHash("sha256").update(`${portfolioId}:${userId}`).digest("hex").slice(0, 20)}`;
-}
-
-export function claimMetaTag(code: string) {
-  return `<meta name="identify-verification" content="${code}">`;
 }

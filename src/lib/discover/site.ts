@@ -3,8 +3,8 @@ import { isIP } from "node:net";
 
 /**
  * Reads other people's websites for Discover: the preview details a site publishes for link
- * sharing (title, description, og:image) and, for claims, whether a verification code is on the
- * page. Only public http(s) hosts on the default ports; never private or local addresses, so a
+ * sharing (title, description, og:image), a published contact email, and copies of preview images.
+ * Only public http(s) hosts on the default ports; never private or local addresses, so a
  * submitted URL can't point the server at its own network. Honours robots.txt for listings.
  */
 
@@ -267,12 +267,3 @@ export async function readSitePreview(input: string): Promise<SitePreview> {
   return { url, name: name || displayHost(url), description, imageUrl, email: publishedEmail(page.text) };
 }
 
-/** True when the site's home page contains `code` (in a meta tag or anywhere in the HTML). */
-export async function siteContainsCode(url: string, code: string) {
-  try {
-    const page = await fetchText(url);
-    return page.status < 400 && page.text.includes(code);
-  } catch {
-    return false;
-  }
-}

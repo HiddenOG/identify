@@ -5,9 +5,8 @@ import { notFound } from "next/navigation";
 import { ActionForm } from "@/components/action-form";
 import { ClaimViewTracker } from "@/components/discover/claim-view-tracker";
 import { PortfolioCard } from "@/components/discover/portfolio-card";
-import { checkClaimCode, claimByEmail } from "@/lib/discover/actions";
-import { claimCode, claimMetaTag, getPortfolio } from "@/lib/discover/portfolios";
-import { displayHost } from "@/lib/discover/site";
+import { claimByEmail, requestClaim } from "@/lib/discover/actions";
+import { getPortfolio } from "@/lib/discover/portfolios";
 import { onboardingHref } from "@/lib/next-path";
 import { getCurrentUser } from "@/lib/profiles";
 import { hasSupabaseEnv } from "@/lib/supabase/env";
@@ -110,41 +109,45 @@ async function Claim({ params }: Pick<PageProps<"/discover/claim/[id]">, "params
     .eq("portfolio_id", portfolio.id)
     .eq("user_id", userId)
     .maybeSingle();
-  const code = claimCode(portfolio.id, userId);
-  const host = displayHost(portfolio.url);
-
   return (
     <>
       {card}
       {pending && (
         <p className="mb-8 rounded-lg border border-line bg-surface p-4 text-sm">
-          We found your code and your claim is waiting for review. You don&apos;t need to do anything else.
+          Your request to claim this is waiting for review. We&apos;ll confirm soon, usually within a day; you don&apos;t need to do
+          anything else.
         </p>
       )}
 
       <section className="border-t border-line py-8">
         <h2 className="text-lg font-bold">Did we email you?</h2>
-        <p className="mt-1 mb-4 text-muted">
-          If you signed in with the email we contacted you on, you can claim it right away.
-        </p>
+        <p className="mt-1 mb-4 text-muted">If you signed in with the email we contacted you on, it&apos;s yours in one click.</p>
         <ActionForm action={claimByEmail} fields={{ id: portfolio.id }} hideOnSuccess>
           <button className={button}>Claim with my sign-in email</button>
         </ActionForm>
       </section>
 
-      <section className="border-t border-line py-8">
-        <h2 className="text-lg font-bold">Or prove it with your site</h2>
-        <p className="mt-1 mb-4 text-muted">
-          Add this line to the <code>&lt;head&gt;</code> of your home page at <strong>{host}</strong> (anywhere on the page also
-          works), publish it, then check.
-        </p>
-        <pre className="mb-4 overflow-x-auto rounded-lg border border-line bg-surface p-4 text-sm select-all">
-          {claimMetaTag(code)}
-        </pre>
-        <ActionForm action={checkClaimCode} fields={{ id: portfolio.id }} hideOnSuccess>
-          <button className={button}>I&apos;ve added it, check my site</button>
-        </ActionForm>
-      </section>
+      {!pending && (
+        <section className="border-t border-line py-8">
+          <h2 className="text-lg font-bold">Signed up with a different email?</h2>
+          <p className="mt-1 mb-4 text-muted">
+            Ask to claim it instead. We&apos;ll quickly check it&apos;s really you, then hand it over.
+          </p>
+          <ActionForm action={requestClaim} fields={{ id: portfolio.id }} hideOnSuccess className="space-y-3">
+            <label className="block text-sm">
+              <span className="mb-1 block text-muted">Anything that helps us confirm it&apos;s you (optional)</span>
+              <textarea
+                name="note"
+                rows={2}
+                maxLength={500}
+                placeholder="e.g. I signed up with my work email, or a link to my LinkedIn"
+                className="w-full rounded-lg border border-line bg-background px-3 py-2 outline-none focus:border-foreground"
+              />
+            </label>
+            <button className={button}>Request to claim</button>
+          </ActionForm>
+        </section>
+      )}
 
       <p className="border-t border-line pt-8 text-sm text-muted">
         Rather not be listed?{" "}

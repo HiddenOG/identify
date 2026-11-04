@@ -6,8 +6,8 @@ import { z } from "zod";
 import { getCurrentUser } from "@/lib/profiles";
 import { createClient } from "@/lib/supabase/server";
 import { isPortfolioCategory } from "./categories";
-import { claimCode, getPortfolio, isAdmin, PORTFOLIOS_TAG } from "./portfolios";
-import { fetchImage, normalizeUrl, readSitePreview, SiteError, siteContainsCode, type SitePreview } from "./site";
+import { getPortfolio, isAdmin, PORTFOLIOS_TAG } from "./portfolios";
+import { fetchImage, normalizeUrl, readSitePreview, SiteError, type SitePreview } from "./site";
 import { supabaseUrl } from "@/lib/supabase/env";
 
 /** What every form on Discover gets back: a message to show, or an error. */
@@ -191,7 +191,7 @@ export async function markInvited(_: ActionState, formData: FormData): Promise<A
   return { message: "Marked as invited." };
 }
 
-/** Re-checks the code on the site, then hands the listing to the member. */
+/** Hands the listing to the member who asked for it (the admin has checked it's really them). */
 export async function approveClaim(_: ActionState, formData: FormData): Promise<ActionState> {
   const supabase = await adminClient();
   if (!supabase) return { error: "Admins only." };
@@ -199,10 +199,8 @@ export async function approveClaim(_: ActionState, formData: FormData): Promise<
   const userId = text(formData, "user_id");
   const portfolio = await getPortfolio(supabase, portfolioId);
   if (!portfolio) return { error: "That listing is gone." };
+  if (portfolio.status !== "listed") return { error: "That listing has already been claimed or removed." };
 
-  if (!(await siteContainsCode(portfolio.url, claimCode(portfolioId, userId)))) {
-    return { error: "The code isn't on their site (any more). Not approved." };
-  }
   const { error } = await supabase
     .from("portfolios")
     .update({ status: "claimed", claimed_by: userId, featured: portfolio.featured })
@@ -278,7 +276,7 @@ export async function claimByEmail(_: ActionState, formData: FormData): Promise<
   if (error) return { error: error.message };
   if (!data) {
     return {
-      error: "Your sign-in email isn't the one we have for this site (or you've already claimed a portfolio). Use the code instead.",
+      error: "Your sign-in email isn't the one we have for this site (or you've already claimed a portfolio). Ask to claim it below instead.",
     };
   }
   changed();
@@ -286,7 +284,11 @@ export async function claimByEmail(_: ActionState, formData: FormData): Promise<
 }
 
 /** Looks for the member's code on the site; if it's there, the claim goes to an admin to confirm. */
-export async function checkClaimCode(_: ActionState, formData: FormData): Promise<ActionState> {
+/**
+ * When the sign-in email isn't the one we contacted: ask to claim, with an optional note
+ * ("I signed up with my work email", a LinkedIn link). An admin checks and approves by hand.
+ */
+export async function requestClaim(_: ActionState, formData: FormData): Promise<ActionState> {
   const supabase = await createClient();
   const { userId } = await getCurrentUser(supabase);
   if (!userId) return { error: "Sign in first." };
@@ -294,15 +296,12 @@ export async function checkClaimCode(_: ActionState, formData: FormData): Promis
   const portfolio = await getPortfolio(supabase, text(formData, "id"));
   if (!portfolio || portfolio.status !== "listed") return { error: "This listing can't be claimed." };
 
-  if (!(await siteContainsCode(portfolio.url, claimCode(portfolio.id, userId)))) {
-    return { error: "We couldn't find the code on your home page yet. Publish it, wait a minute, then try again." };
-  }
-  const { error } = await supabase.from("portfolio_claims").upsert(
-    { portfolio_id: portfolio.id, user_id: userId },
-    { onConflict: "portfolio_id,user_id", ignoreDuplicates: true },
-  );
-  if (error) return { error: error.message };
-  return { message: "Found it. We'll confirm your claim within a day; you can remove the code after that." };
+  const note = text(formData, "note").slice(0, 500) || null;
+  const { error } = await supabase
+    .from("portfolio_claims")
+    .upsert({ portfolio_id: portfolio.id, user_id: userId, note }, { onConflict: "portfolio_id,user_id" });
+  if (error) return { error: "Couldn't send your request. Try again." };
+  return { message: "Request sent. We'll check it's you and confirm, usually within a day." };
 }
 
 // ---------- Anyone ----------

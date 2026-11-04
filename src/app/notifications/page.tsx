@@ -83,7 +83,7 @@ function Describe({ n, username }: { n: NotificationRow; username: string }) {
     </Link>
   );
   if (n.type === "portfolio_claimed") return <>claimed their Discover listing, {listing}. 🎉</>;
-  if (n.type === "portfolio_claim_request") return <>asked to claim {listing}. Check their site code in Discover admin.</>;
+  if (n.type === "portfolio_claim_request") return <>asked to claim {listing}. Review it in Discover admin.</>;
   if (n.type === "follow") return <>started following you.</>;
   const project = n.project ? (
     <Link href={projectHref(username, n.project.slug)} className="font-medium underline">

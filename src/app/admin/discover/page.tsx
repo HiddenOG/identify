@@ -34,7 +34,7 @@ export default function DiscoverAdminPage() {
 }
 
 type Contact = { portfolio_id: string; email: string | null; invited_at: string | null; do_not_contact: boolean };
-type Claim = { portfolio_id: string; user_id: string; created_at: string; profile: { username: string | null } | null };
+type Claim = { portfolio_id: string; user_id: string; created_at: string; note?: string | null; profile: { username: string | null } | null };
 type Removal = { id: string; portfolio_id: string | null; email: string | null; reason: string | null; created_at: string };
 
 const small = "rounded-full border border-line px-3 py-1 text-xs hover:border-foreground disabled:opacity-50";
@@ -106,12 +106,16 @@ async function Admin() {
                       <Link href={`/${c.profile?.username}`} className="font-bold hover:underline">
                         @{c.profile?.username}
                       </Link>{" "}
-                      claims <strong>{p?.name}</strong> ({p && displayHost(p.url)})
+                      wants to claim <strong>{p?.name}</strong> ({p && displayHost(p.url)})
                     </p>
-                    <p className="text-xs text-muted">{formatDate(c.created_at)}</p>
+                    {c.note && <p className="mt-1 text-muted">“{c.note}”</p>}
+                    <p className="text-xs text-muted">
+                      {formatDate(c.created_at)} · Check it&apos;s them first, e.g. reply to the email on their site or message them
+                      on LinkedIn.
+                    </p>
                   </div>
                   <ActionForm action={approveClaim} fields={fields}>
-                    <button className={small}>Check site &amp; approve</button>
+                    <button className={small}>Approve</button>
                   </ActionForm>
                   <ActionForm action={rejectClaim} fields={fields}>
                     <button className={small}>Reject</button>
@@ -309,7 +313,7 @@ function PortfolioList({
 const ACTIVITY_TEXT: Record<ActivityKind, string> = {
   claim_view: "opened the claim link for",
   claimed: "claimed",
-  claim_requested: "asked to claim (site code):",
+  claim_requested: "asked to claim",
   removed: "removed the listing for",
   invited: "invite marked as sent for",
 };
