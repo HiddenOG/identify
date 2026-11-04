@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ActionForm } from "@/components/action-form";
+import { ClaimViewTracker } from "@/components/discover/claim-view-tracker";
 import { PortfolioCard } from "@/components/discover/portfolio-card";
 import { checkClaimCode, claimByEmail } from "@/lib/discover/actions";
 import { claimCode, claimMetaTag, getPortfolio } from "@/lib/discover/portfolios";
@@ -41,6 +42,8 @@ async function Claim({ params }: Pick<PageProps<"/discover/claim/[id]">, "params
   const card = (
     <div className="mb-10 max-w-sm">
       <PortfolioCard portfolio={portfolio} />
+      {/* Every branch shows the card, so this logs each open of the claim link for Discover admin. */}
+      <ClaimViewTracker portfolioId={portfolio.id} />
     </div>
   );
 

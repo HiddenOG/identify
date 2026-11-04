@@ -13,13 +13,15 @@ import {
   getFollowerDates,
   getPeriodTotals,
   getStoryStats,
-  monthLabel,
-  monthRange,
+  daysInRange,
   previousMonth,
+  rangeLabel,
+  statsRange,
 } from "@/lib/stats";
 import { SITE_NAME } from "@/lib/site";
 import { hasSupabaseEnv } from "@/lib/supabase/env";
 import { createClient } from "@/lib/supabase/server";
+import { DateRangePicker } from "./date-range-picker";
 import { PeriodSelect } from "./period-select";
 
 export const metadata: Metadata = { title: "Stats", robots: { index: false } };
@@ -67,20 +69,12 @@ async function Stats({ searchParams }: Pick<PageProps<"/stats">, "searchParams">
         </Link>
       </div>
       {tab === "stories" ? (
-        <StoriesTab month={one(params.month)} userId={userId} username={profile.username} joined={profile.created_at} />
+        <StoriesTab from={one(params.from)} to={one(params.to)} userId={userId} username={profile.username} joined={profile.created_at} />
       ) : (
         <AudienceTab year={one(params.year)} userId={userId} joined={profile.created_at} />
       )}
     </>
   );
-}
-
-/** The last 12 months, newest first, never before the account existed. */
-function monthOptions(joined: string) {
-  const first = joined.slice(0, 7);
-  const out: { value: string; label: string }[] = [];
-  for (let m = currentMonth(); out.length < 12 && m >= first; m = previousMonth(m)) out.push({ value: m, label: monthLabel(m) });
-  return out;
 }
 
 function PeriodHeading({ title, range, children }: { title: string; range: string; children?: React.ReactNode }) {
@@ -107,27 +101,23 @@ function Tile({ value, label, delta }: { value: string; label: string; delta?: n
   );
 }
 
-async function StoriesTab({ month, userId, username, joined }: { month: string; userId: string; username: string; joined: string }) {
-  const options = monthOptions(joined);
-  const selected = options.some((o) => o.value === month) ? month : currentMonth();
+async function StoriesTab({ from, to, userId, username, joined }: { from: string; to: string; userId: string; username: string; joined: string }) {
+  const { start, end, today, first } = statsRange(from, to, joined);
   const supabase = await createClient();
   const [daily, totals, storyStats, projects] = await Promise.all([
-    getDailyStats(supabase, selected),
-    getPeriodTotals(supabase, selected),
+    getDailyStats(supabase, start, end),
+    getPeriodTotals(supabase, start, end),
     getStoryStats(supabase),
     getProjectsByAuthor(supabase, userId),
   ]);
 
-  const { start, end } = monthRange(selected);
-  const today = new Date().toISOString().slice(0, 10);
-  const isCurrent = selected === currentMonth();
+  const days = daysInRange(start, end);
   const points = daily.map((d) => {
     const date = new Date(`${d.day}T00:00:00Z`);
-    const future = d.day > today;
     return {
       tick: date.toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" }),
       label: date.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", timeZone: "UTC" }),
-      values: future ? [null, null] : [d.views, d.reads],
+      values: [d.views, d.reads],
     };
   });
   const published = projects.filter((p) => p.status === "published");
@@ -135,10 +125,10 @@ async function StoriesTab({ month, userId, username, joined }: { month: string; 
   return (
     <>
       <PeriodHeading
-        title="Monthly"
-        range={`${formatDate(`${start}T12:00:00Z`)} – ${isCurrent ? "Today" : formatDate(`${end}T12:00:00Z`)} (UTC) · Updated live`}
+        title="Overview"
+        range={`${rangeLabel(start, end)}${end === today ? " (today)" : ""} · ${days} ${days === 1 ? "day" : "days"}, UTC · Updated live`}
       >
-        <PeriodSelect param="month" value={selected} options={options} label="Month" />
+        <DateRangePicker start={start} end={end} min={first} max={today} />
       </PeriodHeading>
 
       <div className="mt-10 flex flex-wrap gap-x-14 gap-y-8">
@@ -150,7 +140,12 @@ async function StoriesTab({ month, userId, username, joined }: { month: string; 
       </div>
 
       <div className="mt-10">
-        <LineChart series={[VIEWS, READS]} points={points} tickEvery={7} caption={`Daily views and reads, ${monthLabel(selected)}`} />
+        <LineChart
+          series={[VIEWS, READS]}
+          points={points}
+          tickEvery={Math.max(1, Math.ceil(days / 5))}
+          caption={`Daily views and reads, ${rangeLabel(start, end)}`}
+        />
       </div>
 
       <div className="mt-16 border-t border-line" />

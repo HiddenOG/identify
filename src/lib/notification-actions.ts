@@ -7,7 +7,7 @@ import { relativeTime } from "@/lib/time";
 
 export type MenuNotification = {
   id: string;
-  type: "like" | "comment" | "follow";
+  type: "like" | "comment" | "follow" | "portfolio_claimed" | "portfolio_claim_request";
   unread: boolean;
   when: string;
   actorName: string;
@@ -15,6 +15,7 @@ export type MenuNotification = {
   actorAvatar: string | null;
   projectTitle: string | null;
   comment: string | null;
+  portfolioName: string | null;
   href: string;
 };
 
@@ -45,9 +46,11 @@ export async function loadMenuNotifications(): Promise<MenuNotification[]> {
     actorAvatar: n.actor.avatar_url,
     projectTitle: n.project?.title ?? null,
     comment: n.comment?.body ?? null,
-    // Likes and comments are always on the recipient's own projects.
-    href:
-      n.type === "follow" || !n.project || !me?.username
+    portfolioName: n.portfolio?.name ?? null,
+    // Likes and comments are always on the recipient's own projects; Discover ones go to the admin page.
+    href: n.type.startsWith("portfolio_")
+      ? "/admin/discover"
+      : n.type === "follow" || !n.project || !me?.username
         ? `/${n.actor.username}`
         : `${projectHref(me.username, n.project.slug)}${n.type === "comment" ? "#responses" : ""}`,
   }));

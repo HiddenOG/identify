@@ -77,6 +77,13 @@ async function NotificationList() {
 
 /** Likes and comments are always on the recipient's own projects, so links use their username. */
 function Describe({ n, username }: { n: NotificationRow; username: string }) {
+  const listing = (
+    <Link href="/admin/discover" className="font-medium underline">
+      {n.portfolio?.name ?? "a Discover listing"}
+    </Link>
+  );
+  if (n.type === "portfolio_claimed") return <>claimed their Discover listing, {listing}. 🎉</>;
+  if (n.type === "portfolio_claim_request") return <>asked to claim {listing}. Check their site code in Discover admin.</>;
   if (n.type === "follow") return <>started following you.</>;
   const project = n.project ? (
     <Link href={projectHref(username, n.project.slug)} className="font-medium underline">

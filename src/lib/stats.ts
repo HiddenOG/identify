@@ -12,41 +12,68 @@ export function currentMonth() {
   return new Date().toISOString().slice(0, 7);
 }
 
-/** First and last UTC day of a "YYYY-MM" month, as "YYYY-MM-DD". */
-export function monthRange(month: string) {
-  const [y, m] = month.split("-").map(Number);
-  const start = new Date(Date.UTC(y, m - 1, 1));
-  const end = new Date(Date.UTC(y, m, 0));
-  return { start: start.toISOString().slice(0, 10), end: end.toISOString().slice(0, 10), days: end.getUTCDate() };
-}
-
 /** The previous "YYYY-MM". */
 export function previousMonth(month: string) {
   const [y, m] = month.split("-").map(Number);
   return new Date(Date.UTC(y, m - 2, 1)).toISOString().slice(0, 7);
 }
 
-export function monthLabel(month: string) {
-  const [y, m] = month.split("-").map(Number);
-  return new Date(Date.UTC(y, m - 1, 1)).toLocaleDateString("en-US", { month: "long", year: "numeric", timeZone: "UTC" });
+const DAY = /^\d{4}-\d{2}-\d{2}$/;
+const MAX_RANGE_DAYS = 366;
+
+/** "YYYY-MM-DD" plus `n` days (UTC). */
+export function addDays(day: string, n: number) {
+  const d = new Date(`${day}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + n);
+  return d.toISOString().slice(0, 10);
 }
 
-/** Every day of the month, zero-filled where nothing happened. */
-export async function getDailyStats(supabase: SupabaseClient, month: string): Promise<DailyPoint[]> {
-  const { start, end, days } = monthRange(month);
+/** Days from `start` to `end`, counting both. */
+export function daysInRange(start: string, end: string) {
+  return Math.round((Date.parse(`${end}T00:00:00Z`) - Date.parse(`${start}T00:00:00Z`)) / 86_400_000) + 1;
+}
+
+/**
+ * The stats period from ?from=&to= (UTC days): defaults to this month so far, never in the
+ * future, never before the account existed, at most a year long, and start ≤ end.
+ */
+export function statsRange(from: string, to: string, joined: string) {
+  const today = new Date().toISOString().slice(0, 10);
+  const first = joined.slice(0, 10);
+  const valid = (d: string) => DAY.test(d) && !Number.isNaN(Date.parse(`${d}T00:00:00Z`));
+  let end = valid(to) && to <= today ? to : today;
+  let start = valid(from) ? from : `${today.slice(0, 7)}-01`;
+  if (start < first) start = first;
+  if (start > end) [start, end] = [end, start];
+  if (daysInRange(start, end) > MAX_RANGE_DAYS) start = addDays(end, -(MAX_RANGE_DAYS - 1));
+  return { start, end, today, first };
+}
+
+const formatDay = (day: string, opts: Intl.DateTimeFormatOptions) =>
+  new Date(`${day}T00:00:00Z`).toLocaleDateString("en-US", { ...opts, timeZone: "UTC" });
+
+/** "Nov 1 – Nov 4, 2026", or "Oct 30, 2025 – Jan 2, 2026" across years. */
+export function rangeLabel(start: string, end: string) {
+  const full: Intl.DateTimeFormatOptions = { month: "short", day: "numeric", year: "numeric" };
+  if (start === end) return formatDay(start, full);
+  const sameYear = start.slice(0, 4) === end.slice(0, 4);
+  return `${formatDay(start, sameYear ? { month: "short", day: "numeric" } : full)} – ${formatDay(end, full)}`;
+}
+
+/** Every day from `start` to `end`, zero-filled where nothing happened. */
+export async function getDailyStats(supabase: SupabaseClient, start: string, end: string): Promise<DailyPoint[]> {
   const { data, error } = await supabase.rpc("my_daily_stats", { start_day: start, end_day: end });
   if (error) console.error("[stats.getDailyStats]", error.message);
   const rows = (data ?? []) as { day: string; views: number; reads: number }[];
   const byDay = new Map(rows.map((r) => [r.day, r]));
-  return Array.from({ length: days }, (_, i) => {
-    const day = `${month}-${String(i + 1).padStart(2, "0")}`;
+  return Array.from({ length: daysInRange(start, end) }, (_, i) => {
+    const day = addDays(start, i);
     const row = byDay.get(day);
     return { day, views: Number(row?.views ?? 0), reads: Number(row?.reads ?? 0) };
   });
 }
 
-export async function getPeriodTotals(supabase: SupabaseClient, month: string): Promise<PeriodTotals> {
-  const { start, end } = monthRange(month);
+export async function getPeriodTotals(supabase: SupabaseClient, start: string, end: string): Promise<PeriodTotals> {
   const { data, error } = await supabase.rpc("my_period_totals", { start_day: start, end_day: end }).maybeSingle<PeriodTotals>();
   if (error) console.error("[stats.getPeriodTotals]", error.message);
   return {

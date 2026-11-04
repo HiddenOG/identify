@@ -1,6 +1,7 @@
 "use server";
 
 import { refresh, updateTag } from "next/cache";
+import { cookies } from "next/headers";
 import { z } from "zod";
 import { getCurrentUser } from "@/lib/profiles";
 import { createClient } from "@/lib/supabase/server";
@@ -318,4 +319,22 @@ export async function requestRemoval(_: ActionState, formData: FormData): Promis
   if (data === "pending") return { message: "Thanks. This profile was claimed by its owner, so we'll review your request." };
   changed();
   return { message: "Done. The listing is gone, and we won't contact you about it." };
+}
+
+/**
+ * Logs that a claim link was opened (Discover admin shows it). Uses the same anonymous
+ * per-browser id as project view stats; the database ignores repeats within 30 minutes.
+ */
+export async function recordClaimView(portfolioId: string) {
+  if (!/^[0-9a-f-]{36}$/i.test(portfolioId)) return;
+  const jar = await cookies();
+  let visitor = jar.get("bf_vid")?.value;
+  if (!visitor) {
+    visitor = crypto.randomUUID();
+    jar.set("bf_vid", visitor, { httpOnly: true, sameSite: "lax", secure: true, maxAge: 60 * 60 * 24 * 365, path: "/" });
+  }
+  const supabase = await createClient();
+  if (await isAdmin(supabase)) return; // you checking a link isn't the person opening it
+  const { error } = await supabase.rpc("record_portfolio_view", { target: portfolioId, visitor_id: visitor });
+  if (error) console.error("[discover.recordClaimView]", error.message);
 }

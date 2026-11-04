@@ -7,6 +7,7 @@ import { CopyInviteButton } from "@/components/discover/copy-invite-button";
 import { SiteImage } from "@/components/discover/site-image";
 import { approveClaim, markInvited, rejectClaim, setPortfolioStatus, storeAllImages, toggleFeatured } from "@/lib/discover/actions";
 import { categoryInfo } from "@/lib/discover/categories";
+import { ago, getDiscoverActivity, type ActivityEvent, type ActivityKind, type ListingActivity } from "@/lib/discover/activity";
 import { isAdmin, type Portfolio } from "@/lib/discover/portfolios";
 import { displayHost } from "@/lib/discover/site";
 import { getCurrentUser } from "@/lib/profiles";
@@ -42,8 +43,9 @@ async function Admin() {
   const supabase = await createClient();
   if (!(await isAdmin(supabase))) notFound();
 
-  const [{ profile }, portfolios, contacts, claims, removals] = await Promise.all([
+  const [{ profile }, { events, byListing }, portfolios, contacts, claims, removals] = await Promise.all([
     getCurrentUser(supabase),
+    getDiscoverActivity(supabase),
     supabase.from("portfolios").select("*").order("created_at", { ascending: false }).limit(500).returns<Portfolio[]>(),
     supabase.from("portfolio_contacts").select("*").returns<Contact[]>(),
     supabase
@@ -78,6 +80,8 @@ async function Admin() {
           </ActionForm>
         </section>
       )}
+
+      <ActivityFeed events={events} names={new Map(all.map((p) => [p.id, p.name]))} />
 
       <section>
         <h2 className="mb-1 text-xl font-bold">Add a portfolio</h2>
@@ -122,7 +126,7 @@ async function Admin() {
       {pending.length > 0 && (
         <section>
           <h2 className="mb-4 text-xl font-bold">Suggestions to review ({pending.length})</h2>
-          <PortfolioList portfolios={pending} contactOf={contactOf} signature={signature} />
+          <PortfolioList portfolios={pending} contactOf={contactOf} signature={signature} activity={byListing} />
         </section>
       )}
 
@@ -131,7 +135,7 @@ async function Admin() {
         {live.length === 0 ? (
           <p className="text-muted">Nothing listed yet.</p>
         ) : (
-          <PortfolioList portfolios={live} contactOf={contactOf} signature={signature} />
+          <PortfolioList portfolios={live} contactOf={contactOf} signature={signature} activity={byListing} />
         )}
       </section>
 
@@ -185,15 +189,18 @@ function PortfolioList({
   portfolios,
   contactOf,
   signature,
+  activity,
 }: {
   portfolios: Portfolio[];
   contactOf: Map<string, Contact>;
   signature: string;
+  activity: Map<string, ListingActivity>;
 }) {
   return (
     <ul className="divide-y divide-line border-y border-line">
       {portfolios.map((p) => {
         const contact = contactOf.get(p.id);
+        const a = activity.get(p.id);
         const canInvite = p.status === "listed" && contact?.email && !contact.do_not_contact;
         return (
           <li key={p.id} className="py-4">
@@ -213,8 +220,35 @@ function PortfolioList({
                   {p.featured && " · featured"}
                   {p.source === "suggested" && " · suggested"}
                   {contact?.do_not_contact && " · do not contact"}
-                  {contact?.invited_at && ` · invited ${formatDate(contact.invited_at)}`}
+                  {contact?.invited_at && ` · invited ${ago(contact.invited_at)}`}
                 </p>
+                {/* What happened after the invite: link opens and the claim. */}
+                {(a?.opens || a?.claimedWhen) && (
+                  <p className="mt-1 text-xs">
+                    {a.opens > 0 && (
+                      <span className="text-foreground">
+                        Claim link opened {a.opens}× by {a.people} {a.people === 1 ? "person" : "people"}, last {a.lastOpen}
+                      </span>
+                    )}
+                    {a.claimedWhen && (
+                      <span className="text-success">
+                        {a.opens > 0 && " · "}Claimed {a.claimedWhen}
+                        {a.claimedBy && (
+                          <>
+                            {" "}
+                            by{" "}
+                            <Link href={`/${a.claimedBy}`} className="underline">
+                              @{a.claimedBy}
+                            </Link>
+                          </>
+                        )}
+                      </span>
+                    )}
+                  </p>
+                )}
+                {contact?.invited_at && !a?.opens && !a?.claimedWhen && (
+                  <p className="mt-1 text-xs text-muted">Invited, but the claim link hasn&apos;t been opened yet.</p>
+                )}
               </div>
             </div>
 
@@ -269,5 +303,55 @@ function PortfolioList({
         );
       })}
     </ul>
+  );
+}
+
+const ACTIVITY_TEXT: Record<ActivityKind, string> = {
+  claim_view: "opened the claim link for",
+  claimed: "claimed",
+  claim_requested: "asked to claim (site code):",
+  removed: "removed the listing for",
+  invited: "invite marked as sent for",
+};
+
+/** The latest Discover events, newest first: who opened, claimed or removed what, and when. */
+function ActivityFeed({ events, names }: { events: ActivityEvent[]; names: Map<string, string> }) {
+  const recent = events.slice(0, 15);
+  return (
+    <section>
+      <h2 className="mb-1 text-xl font-bold">Activity</h2>
+      <p className="mb-4 text-sm text-muted">What happens after an invite goes out. Opens are counted once per person per 30 minutes; your own visits aren&apos;t counted.</p>
+      {recent.length === 0 ? (
+        <p className="text-sm text-muted">Nothing yet. Once you send invites, link opens and claims show up here.</p>
+      ) : (
+        <ul className="divide-y divide-line border-y border-line text-sm">
+          {recent.map((e) => {
+            const who = e.user?.username ? (
+              <Link href={`/${e.user.username}`} className="font-semibold hover:underline">
+                @{e.user.username}
+              </Link>
+            ) : e.kind === "invited" ? (
+              <span className="font-semibold">You</span>
+            ) : (
+              <span className="font-semibold">Someone</span>
+            );
+            return (
+              <li key={e.id} className={`flex flex-wrap items-baseline gap-x-1.5 py-2.5 ${e.kind === "claimed" ? "text-success" : ""}`}>
+                {e.kind === "invited" ? (
+                  <>
+                    Invite sent to <strong>{names.get(e.portfolio_id) ?? "a deleted listing"}</strong>
+                  </>
+                ) : (
+                  <>
+                    {who} {ACTIVITY_TEXT[e.kind]} <strong>{names.get(e.portfolio_id) ?? "a deleted listing"}</strong>
+                  </>
+                )}
+                <span className="ml-auto text-xs text-muted">{e.when}</span>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </section>
   );
 }

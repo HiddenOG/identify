@@ -87,24 +87,13 @@ async function Directory({ searchParams }: Pick<PageProps<"/people">, "searchPar
         <p className="text-muted">No one matches these filters yet.</p>
       ) : (
         <ul className="divide-y divide-line">
-          {people.map(({ id, view, cv }) => {
-            const chips = [...cv.tools, ...cv.skills].slice(0, 6);
-            return (
-              <li key={id} className="py-4">
-                <PersonLink person={view} size={44} />
-                {(view.location || chips.length > 0) && (
-                  <div className="mt-2 flex flex-wrap items-center gap-2 pl-14 text-xs text-muted">
-                    {view.location && <span>📍 {view.location}</span>}
-                    {chips.map((c) => (
-                      <span key={c} className="rounded-full bg-surface px-2 py-0.5">
-                        {c}
-                      </span>
-                    ))}
-                  </div>
-                )}
-              </li>
-            );
-          })}
+          {people.map(({ id, view, cv }) => (
+            <li key={id} className="py-4">
+              <PersonLink person={view} size={44} />
+              {/* A taste of their profile summary; with none, the role under the name says enough. */}
+              {cv.summary && <p className="mt-2 line-clamp-2 pl-14 text-sm text-muted">{cv.summary}</p>}
+            </li>
+          ))}
         </ul>
       )}
     </>

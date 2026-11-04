@@ -9,6 +9,9 @@ import { loadMenuNotifications, type MenuNotification } from "@/lib/notification
 
 function Describe({ n }: { n: MenuNotification }) {
   const title = n.projectTitle && <span className="text-foreground">{n.projectTitle}</span>;
+  const listing = <span className="text-foreground">{n.portfolioName ?? "a Discover listing"}</span>;
+  if (n.type === "portfolio_claimed") return <>claimed their Discover listing, {listing} 🎉</>;
+  if (n.type === "portfolio_claim_request") return <>asked to claim {listing}. Check their site code in Discover admin</>;
   if (n.type === "follow") return <>followed you</>;
   if (n.type === "like") return <>liked {title ?? "your project"}</>;
   return <>responded to {title ?? "your project"}</>;
