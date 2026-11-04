@@ -1,16 +1,17 @@
 import { Suspense } from "react";
 import type { Metadata } from "next";
-import { headers } from "next/headers";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ActionForm } from "@/components/action-form";
+import { CopyInviteButton } from "@/components/discover/copy-invite-button";
 import { SiteImage } from "@/components/discover/site-image";
 import { approveClaim, markInvited, rejectClaim, setPortfolioStatus, storeAllImages, toggleFeatured } from "@/lib/discover/actions";
 import { categoryInfo } from "@/lib/discover/categories";
 import { isAdmin, type Portfolio } from "@/lib/discover/portfolios";
 import { displayHost } from "@/lib/discover/site";
 import { getCurrentUser } from "@/lib/profiles";
-import { SITE_NAME } from "@/lib/site";
+import { CONTACT_EMAIL, SITE_NAME, SITE_URL } from "@/lib/site";
+import { inviteHtml, inviteSubject, inviteText } from "@/lib/discover/invite";
 import { hasSupabaseEnv, supabaseUrl } from "@/lib/supabase/env";
 import { createClient } from "@/lib/supabase/server";
 import { formatDate } from "@/lib/projects";
@@ -41,9 +42,8 @@ async function Admin() {
   const supabase = await createClient();
   if (!(await isAdmin(supabase))) notFound();
 
-  const [{ profile }, h, portfolios, contacts, claims, removals] = await Promise.all([
+  const [{ profile }, portfolios, contacts, claims, removals] = await Promise.all([
     getCurrentUser(supabase),
-    headers(),
     supabase.from("portfolios").select("*").order("created_at", { ascending: false }).limit(500).returns<Portfolio[]>(),
     supabase.from("portfolio_contacts").select("*").returns<Contact[]>(),
     supabase
@@ -54,7 +54,6 @@ async function Admin() {
     supabase.from("portfolio_removals").select("*").order("created_at", { ascending: false }).limit(20).returns<Removal[]>(),
   ]);
 
-  const origin = h.get("origin") ?? `https://${h.get("host")}`;
   const all = portfolios.data ?? [];
   const byId = new Map(all.map((p) => [p.id, p]));
   const contactOf = new Map((contacts.data ?? []).map((c) => [c.portfolio_id, c]));
@@ -123,7 +122,7 @@ async function Admin() {
       {pending.length > 0 && (
         <section>
           <h2 className="mb-4 text-xl font-bold">Suggestions to review ({pending.length})</h2>
-          <PortfolioList portfolios={pending} contactOf={contactOf} origin={origin} signature={signature} />
+          <PortfolioList portfolios={pending} contactOf={contactOf} signature={signature} />
         </section>
       )}
 
@@ -132,7 +131,7 @@ async function Admin() {
         {live.length === 0 ? (
           <p className="text-muted">Nothing listed yet.</p>
         ) : (
-          <PortfolioList portfolios={live} contactOf={contactOf} origin={origin} signature={signature} />
+          <PortfolioList portfolios={live} contactOf={contactOf} signature={signature} />
         )}
       </section>
 
@@ -168,33 +167,27 @@ async function Admin() {
   );
 }
 
-function inviteLink(p: Portfolio, email: string, origin: string, signature: string) {
-  const first = p.name.split(/\s+/)[0];
-  const subject = `${first}, your portfolio is featured on ${SITE_NAME}`;
-  const body = [
-    `Hi ${first},`,
-    "",
-    `I came across ${displayHost(p.url)} and featured it on ${SITE_NAME}, a place where people's work speaks for them, under ${categoryInfo(p.category).label}: ${origin}/discover/${p.category}`,
-    "",
-    `The listing only shows your name, your role and a link to your site. You can claim it for free, which turns it into your own profile with a CV website: ${origin}/discover/claim/${p.id}`,
-    "",
-    `If you'd rather not be listed, this removes it straight away and we won't contact you again: ${origin}/discover/remove/${p.id}`,
-    "",
-    "Best,",
-    signature,
-  ].join("\n");
-  return `mailto:${email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+/** The designed invite for one listing. Links always use the live site, even when testing locally. */
+function inviteFor(p: Portfolio, signature: string) {
+  const details = {
+    name: p.name,
+    host: displayHost(p.url),
+    categoryLabel: categoryInfo(p.category).label,
+    categoryUrl: `${SITE_URL}/discover/${p.category}`,
+    claimUrl: `${SITE_URL}/discover/claim/${p.id}`,
+    removeUrl: `${SITE_URL}/discover/remove/${p.id}`,
+    sender: signature.split(/\s+/)[0],
+  };
+  return { subject: inviteSubject(p.name), html: inviteHtml(details), text: inviteText(details) };
 }
 
 function PortfolioList({
   portfolios,
   contactOf,
-  origin,
   signature,
 }: {
   portfolios: Portfolio[];
   contactOf: Map<string, Contact>;
-  origin: string;
   signature: string;
 }) {
   return (
@@ -238,9 +231,7 @@ function PortfolioList({
               )}
               {canInvite && (
                 <>
-                  <a href={inviteLink(p, contact.email!, origin, signature)} className={small}>
-                    Write invite
-                  </a>
+                  <CopyInviteButton {...inviteFor(p, signature)} to={contact.email!} fromAccount={CONTACT_EMAIL} className={small} />
                   <ActionForm action={markInvited} fields={{ id: p.id }}>
                     <button className={small}>Mark invited</button>
                   </ActionForm>
