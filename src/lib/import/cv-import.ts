@@ -26,7 +26,14 @@ export async function importCvText(text: string): Promise<CvImportResult> {
         notes.push(`${provider.label} found nothing usable`);
         continue;
       }
-      return { ...result, source: provider.label, notes };
+      // Models sometimes skip a contact detail that's plainly in the text; the free parser's
+      // pattern matching fills any gaps (it never overrides what the model found).
+      const found = normalizeExtracted(ruleParseCv(text)).cv.links;
+      const links = { ...result.cv.links };
+      for (const key of ["email", "phone", "linkedin", "github", "website"] as const) {
+        if (!links[key] && found[key]) links[key] = found[key];
+      }
+      return { ...result, cv: { ...result.cv, links }, source: provider.label, notes };
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       console.error(`[cv-import] ${provider.id} failed:`, message);

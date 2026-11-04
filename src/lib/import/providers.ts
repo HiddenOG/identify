@@ -26,12 +26,19 @@ function parseJsonReply(reply: string): unknown {
 }
 
 async function postJson(url: string, headers: Record<string, string>, body: unknown) {
-  const res = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", ...headers },
-    body: JSON.stringify(body),
-    signal: AbortSignal.timeout(TIMEOUT_MS),
-  });
+  const send = () =>
+    fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...headers },
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(TIMEOUT_MS),
+    });
+  let res = await send();
+  // Free tiers are often briefly busy ("high demand", rate limits): one retry before falling back.
+  if (res.status === 429 || res.status === 503) {
+    await new Promise((r) => setTimeout(r, 2500));
+    res = await send();
+  }
   if (!res.ok) throw new Error(`HTTP ${res.status}: ${(await res.text()).slice(0, 200)}`);
   return res.json();
 }
@@ -85,7 +92,7 @@ const groq: Provider = {
     openAiCompatible(
       "https://api.groq.com/openai/v1/chat/completions",
       process.env.GROQ_API_KEY!,
-      process.env.GROQ_MODEL || "llama-3.3-70b-versatile",
+      process.env.GROQ_MODEL || "openai/gpt-oss-120b",
       cvText,
     ),
 };

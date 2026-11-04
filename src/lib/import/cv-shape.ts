@@ -122,7 +122,8 @@ export function normalizeExtracted(x: ExtractedCv): ImportedCv {
       .slice(0, 20),
     links: {
       email: /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ? email.slice(0, 120) : "",
-      phone: /^[+\d][\d\s()-]{4,}$/.test(phone) ? phone.slice(0, 40) : "",
+      // Allows "(+234) 809…" and "+44 (0)7700…" as well as plain numbers.
+      phone: /^[+(\d][\d\s()+.-]{4,}$/.test(phone) && phone.replace(/\D/g, "").length >= 7 ? phone.slice(0, 40) : "",
       linkedin: toUrl(x.links.linkedin, /linkedin\.com/i),
       github: toUrl(x.links.github, /github\.com/i),
       website: toUrl(x.links.website),
