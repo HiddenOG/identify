@@ -10,7 +10,7 @@ import { isBookmarked } from "@/lib/stats";
 import { FollowButton } from "@/components/follow-button";
 import { MessageButton } from "@/components/message-button";
 import { CommentIcon } from "@/components/icons";
-import { LogoMark } from "@/components/logo";
+import { Logo } from "@/components/logo";
 import { LikeButton } from "@/components/like-button";
 import { Markdown } from "@/components/markdown";
 import { TagLink } from "@/components/tag-link";
@@ -92,7 +92,7 @@ async function Project({ params }: Pick<PageProps<"/[username]/[slug]">, "params
         <div className="fixed inset-x-0 top-0 z-50 h-14 border-b border-line bg-background">
           <div className="mx-auto flex h-full max-w-5xl items-center gap-4 px-4">
             <Link href="/" aria-label={`${SITE_NAME} home`} className="shrink-0">
-              <LogoMark size={26} />
+              <Logo size={26} />
             </Link>
             <span className="text-sm">Draft</span>
             <span className="hidden text-sm text-muted sm:inline">Only you can see this</span>

@@ -9,7 +9,7 @@ import { saveProject, type SaveProjectState } from "@/lib/project-actions";
 import { FeaturePanel } from "@/components/feature-panel";
 import { FEATURE_OUTLINE, type AboutChoice } from "@/lib/features";
 import type { ProjectRow } from "@/lib/projects";
-import { LogoMark } from "@/components/logo";
+import { Logo } from "@/components/logo";
 import { SITE_NAME } from "@/lib/site";
 import { createClient } from "@/lib/supabase/client";
 
@@ -122,7 +122,7 @@ export function ProjectEditor({
       <div className="fixed inset-x-0 top-0 z-50 h-14 border-b border-line bg-background">
         <div className="mx-auto flex h-full max-w-5xl items-center gap-4 px-4">
           <Link href="/" aria-label={`${SITE_NAME} home`} className="shrink-0">
-            <LogoMark size={26} />
+            <Logo size={26} />
           </Link>
           <span className="text-sm">{published ? "Published" : "Draft"}</span>
           {saveStatus && <span className="hidden text-sm text-muted sm:inline">{saveStatus}</span>}
