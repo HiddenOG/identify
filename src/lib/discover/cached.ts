@@ -1,4 +1,6 @@
 import { cacheLife, cacheTag } from "next/cache";
+import { getFeatures, type FeatureSection } from "@/lib/features";
+import { PROJECTS_TAG } from "@/lib/projects";
 import { createPublicClient } from "@/lib/supabase/public";
 import type { PortfolioCategory } from "./categories";
 import { getPublicPortfolios, PORTFOLIOS_TAG } from "./portfolios";
@@ -9,4 +11,12 @@ export async function getCachedPortfolios(category?: PortfolioCategory) {
   cacheLife("minutes");
   cacheTag(PORTFOLIOS_TAG);
   return getPublicPortfolios(createPublicClient(), category, category ? 60 : 200);
+}
+
+/** Cached published features (Discoveries); a new feature or a claim clears it. */
+export async function getCachedFeatures(section?: FeatureSection, limit = 30) {
+  "use cache";
+  cacheLife("minutes");
+  cacheTag(PROJECTS_TAG, PORTFOLIOS_TAG);
+  return getFeatures(createPublicClient(), section, limit);
 }

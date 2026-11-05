@@ -1,10 +1,11 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { FeatureCard, FeatureHero } from "@/components/discover/feature-card";
 import { PortfolioBento, PortfolioCard } from "@/components/discover/portfolio-card";
 import { ShowMore } from "@/components/show-more";
 import { SiteImage } from "@/components/discover/site-image";
 import { SetupNotice } from "@/components/setup-notice";
-import { getCachedPortfolios } from "@/lib/discover/cached";
+import { getCachedFeatures, getCachedPortfolios } from "@/lib/discover/cached";
 import { PORTFOLIO_CATEGORIES } from "@/lib/discover/categories";
 import { displayHost } from "@/lib/discover/site";
 import { hasSupabaseEnv } from "@/lib/supabase/env";
@@ -24,7 +25,8 @@ export default async function DiscoverPage() {
   }
 
   // Only what an admin lists appears here; new sign-ups are never added automatically.
-  const portfolios = await getCachedPortfolios();
+  const [portfolios, features] = await Promise.all([getCachedPortfolios(), getCachedFeatures(undefined, 4)]);
+  const [lead, ...moreFeatures] = features;
   const featured = portfolios.slice(0, 3);
   const featuredIds = new Set(featured.map((p) => p.id));
   const shelves = PORTFOLIO_CATEGORIES.map((c) => {
@@ -47,6 +49,25 @@ export default async function DiscoverPage() {
         </Link>
       </div>
 
+      {lead && (
+        <section className="mb-14">
+          <div className="mb-4 flex items-baseline justify-between gap-4">
+            <h2 className="text-xl font-bold">Discoveries</h2>
+            <Link href="/discover/features" className="shrink-0 text-sm font-medium text-success hover:underline">
+              All stories
+            </Link>
+          </div>
+          <FeatureHero feature={lead} priority />
+          {moreFeatures.length > 0 && (
+            <div className="mt-10 grid gap-x-6 gap-y-10 sm:grid-cols-2 lg:grid-cols-3">
+              {moreFeatures.map((f) => (
+                <FeatureCard key={f.id} feature={f} />
+              ))}
+            </div>
+          )}
+        </section>
+      )}
+
       {portfolios.length === 0 ? (
         <p className="py-10 text-muted">
           Nothing here yet.{" "}
@@ -59,7 +80,7 @@ export default async function DiscoverPage() {
         <>
           <section className="mb-14">
             <h2 className="mb-4 text-xl font-bold">Featured</h2>
-            <PortfolioBento portfolios={featured} priority />
+            <PortfolioBento portfolios={featured} priority={!lead} />
           </section>
 
           <section>

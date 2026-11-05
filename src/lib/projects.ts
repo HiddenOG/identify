@@ -44,6 +44,14 @@ export type ProjectRow = {
   comment_count: number;
   created_at: string;
   updated_at: string;
+  /** Set on Identify's editorial features (Discoveries): the listing of the person it's about. */
+  about_portfolio?: string | null;
+  /** Or the Identify member it's about. */
+  about_member?: string | null;
+  feature_section?: "builders" | "projects" | "rising" | null;
+  editors_pick?: boolean;
+  /** When an admin put it on the home feed's Featured tab (Medium-style); null if not featured. */
+  featured_at?: string | null;
 };
 
 export type ProjectAuthor = { username: string; full_name: string | null; avatar_url: string | null };
@@ -188,6 +196,21 @@ export async function getFeed(supabase: SupabaseClient, limit = 30) {
     .limit(limit)
     .returns<ProjectWithAuthor[]>();
   logError("getFeed", error);
+  return data ?? [];
+}
+
+/** The Featured tab: stories an admin featured (Discoveries features included), newest pick first. */
+export async function getFeatured(supabase: SupabaseClient, limit = 30) {
+  const { data, error } = await supabase
+    .from("projects")
+    .select(WITH_AUTHOR)
+    .eq("status", "published")
+    .not("featured_at", "is", null)
+    .order("featured_at", { ascending: false })
+    .limit(limit)
+    .returns<ProjectWithAuthor[]>();
+  // Before the discoveries migration there's no featured_at; the home page falls back to trending.
+  if (error && !error.message.includes("featured_at")) logError("getFeatured", error);
   return data ?? [];
 }
 

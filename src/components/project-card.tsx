@@ -15,6 +15,7 @@ export function ProjectCard({ project }: { project: ProjectWithAuthor }) {
       <Link href={`/${project.author.username}`} className="mb-3 flex w-max max-w-full items-center gap-2 text-[13px] hover:underline">
         <AuthorAvatar name={authorName} url={project.author.avatar_url} size={20} />
         <span className="truncate">{authorName}</span>
+        {project.feature_section && <span className="shrink-0 text-muted">in Discoveries</span>}
       </Link>
 
       <div className="flex gap-6 sm:gap-12">
@@ -24,6 +25,12 @@ export function ProjectCard({ project }: { project: ProjectWithAuthor }) {
             {project.summary && <p className="mt-2 line-clamp-2 text-muted">{project.summary}</p>}
           </Link>
           <div className="mt-5 flex flex-wrap items-center gap-x-4 gap-y-2 text-[13px] text-muted">
+            {/* Medium's star for stories the editors featured. */}
+            {project.featured_at && (
+              <span className="text-success" title="Featured by Identify" aria-label="Featured">
+                ✦
+              </span>
+            )}
             <span>{formatDate(project.published_at)}</span>
             <span>{readingMinutes(project.body_md)} min read</span>
             {project.like_count > 0 && (

@@ -15,7 +15,7 @@ import { CONTACT_EMAIL, SITE_NAME, SITE_URL } from "@/lib/site";
 import { inviteHtml, inviteSubject, inviteText } from "@/lib/discover/invite";
 import { hasSupabaseEnv, supabaseUrl } from "@/lib/supabase/env";
 import { createClient } from "@/lib/supabase/server";
-import { formatDate } from "@/lib/projects";
+import { formatDate, projectHref } from "@/lib/projects";
 import { PortfolioForm } from "@/components/discover/portfolio-form";
 
 export const metadata: Metadata = { title: "Discover admin", robots: { index: false } };
@@ -35,6 +35,10 @@ export default function DiscoverAdminPage() {
 
 type Contact = { portfolio_id: string; email: string | null; invited_at: string | null; do_not_contact: boolean };
 type Claim = { portfolio_id: string; user_id: string; created_at: string; note?: string | null; profile: { username: string | null } | null };
+type FeatureRow = { about_portfolio: string; slug: string; title: string; status: string; author: { username: string } | null };
+/** A listing's newest Discoveries feature (published wins over drafts). */
+type ListingFeature = { title: string; href: string; published: boolean };
+
 type Removal = { id: string; portfolio_id: string | null; email: string | null; reason: string | null; created_at: string };
 
 const small = "rounded-full border border-line px-3 py-1 text-xs hover:border-foreground disabled:opacity-50";
@@ -43,7 +47,7 @@ async function Admin() {
   const supabase = await createClient();
   if (!(await isAdmin(supabase))) notFound();
 
-  const [{ profile }, { events, byListing }, portfolios, contacts, claims, removals] = await Promise.all([
+  const [{ profile }, { events, byListing }, portfolios, contacts, claims, removals, features] = await Promise.all([
     getCurrentUser(supabase),
     getDiscoverActivity(supabase),
     supabase.from("portfolios").select("*").order("created_at", { ascending: false }).limit(500).returns<Portfolio[]>(),
@@ -54,11 +58,26 @@ async function Admin() {
       .order("created_at")
       .returns<Claim[]>(),
     supabase.from("portfolio_removals").select("*").order("created_at", { ascending: false }).limit(20).returns<Removal[]>(),
+    // Only your own drafts come back (RLS), plus everyone's published features.
+    supabase
+      .from("projects")
+      .select("about_portfolio, slug, title, status, author:profiles!projects_author_id_fkey(username)")
+      .not("about_portfolio", "is", null)
+      .order("created_at", { ascending: false })
+      .returns<FeatureRow[]>(),
   ]);
 
   const all = portfolios.data ?? [];
   const byId = new Map(all.map((p) => [p.id, p]));
   const contactOf = new Map((contacts.data ?? []).map((c) => [c.portfolio_id, c]));
+  const featureOf = new Map<string, ListingFeature>();
+  for (const f of features.data ?? []) {
+    // Rows are newest first: keep the newest published one, or the newest draft if none is published.
+    const published = f.status === "published";
+    const kept = featureOf.get(f.about_portfolio);
+    if (!f.author || kept?.published || (kept && !published)) continue;
+    featureOf.set(f.about_portfolio, { title: f.title, href: projectHref(f.author.username, f.slug), published });
+  }
   const pending = all.filter((p) => p.status === "pending");
   const live = all.filter((p) => p.status === "listed" || p.status === "claimed");
   const signature = profile?.full_name || SITE_NAME;
@@ -130,7 +149,7 @@ async function Admin() {
       {pending.length > 0 && (
         <section>
           <h2 className="mb-4 text-xl font-bold">Suggestions to review ({pending.length})</h2>
-          <PortfolioList portfolios={pending} contactOf={contactOf} signature={signature} activity={byListing} />
+          <PortfolioList portfolios={pending} contactOf={contactOf} featureOf={featureOf} signature={signature} activity={byListing} />
         </section>
       )}
 
@@ -139,7 +158,7 @@ async function Admin() {
         {live.length === 0 ? (
           <p className="text-muted">Nothing listed yet.</p>
         ) : (
-          <PortfolioList portfolios={live} contactOf={contactOf} signature={signature} activity={byListing} />
+          <PortfolioList portfolios={live} contactOf={contactOf} featureOf={featureOf} signature={signature} activity={byListing} />
         )}
       </section>
 
@@ -176,7 +195,7 @@ async function Admin() {
 }
 
 /** The designed invite for one listing. Links always use the live site, even when testing locally. */
-function inviteFor(p: Portfolio, signature: string) {
+function inviteFor(p: Portfolio, signature: string, feature?: ListingFeature) {
   const details = {
     name: p.name,
     host: displayHost(p.url),
@@ -185,18 +204,21 @@ function inviteFor(p: Portfolio, signature: string) {
     claimUrl: `${SITE_URL}/discover/claim/${p.id}`,
     removeUrl: `${SITE_URL}/discover/remove/${p.id}`,
     sender: signature.split(/\s+/)[0],
+    feature: feature?.published ? { title: feature.title, url: `${SITE_URL}${feature.href}` } : undefined,
   };
-  return { subject: inviteSubject(p.name), html: inviteHtml(details), text: inviteText(details) };
+  return { subject: inviteSubject(p.name, Boolean(details.feature)), html: inviteHtml(details), text: inviteText(details) };
 }
 
 function PortfolioList({
   portfolios,
   contactOf,
+  featureOf,
   signature,
   activity,
 }: {
   portfolios: Portfolio[];
   contactOf: Map<string, Contact>;
+  featureOf: Map<string, ListingFeature>;
   signature: string;
   activity: Map<string, ListingActivity>;
 }) {
@@ -205,6 +227,7 @@ function PortfolioList({
       {portfolios.map((p) => {
         const contact = contactOf.get(p.id);
         const a = activity.get(p.id);
+        const feature = featureOf.get(p.id);
         const canInvite = p.status === "listed" && contact?.email && !contact.do_not_contact;
         return (
           <li key={p.id} className="py-4">
@@ -250,6 +273,15 @@ function PortfolioList({
                     )}
                   </p>
                 )}
+                {feature && (
+                  <p className="mt-1 text-xs">
+                    {feature.published ? "Feature: " : "Feature draft: "}
+                    <Link href={feature.href} className="underline">
+                      {feature.title}
+                    </Link>
+                    {feature.published && canInvite && <span className="text-muted"> · the invite leads with it</span>}
+                  </p>
+                )}
                 {contact?.invited_at && !a?.opens && !a?.claimedWhen && (
                   <p className="mt-1 text-xs text-muted">Invited, but the claim link hasn&apos;t been opened yet.</p>
                 )}
@@ -267,9 +299,14 @@ function PortfolioList({
                   <button className={small}>{p.featured ? "Unfeature" : "Feature"}</button>
                 </ActionForm>
               )}
+              {p.status !== "pending" && !feature && (
+                <Link href={`/new?about=${p.id}`} className={small}>
+                  Write a feature
+                </Link>
+              )}
               {canInvite && (
                 <>
-                  <CopyInviteButton {...inviteFor(p, signature)} to={contact.email!} fromAccount={CONTACT_EMAIL} className={small} />
+                  <CopyInviteButton {...inviteFor(p, signature, feature)} to={contact.email!} fromAccount={CONTACT_EMAIL} className={small} />
                   <ActionForm action={markInvited} fields={{ id: p.id }}>
                     <button className={small}>Mark invited</button>
                   </ActionForm>

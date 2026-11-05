@@ -7,7 +7,7 @@ import { relativeTime } from "@/lib/time";
 
 export type MenuNotification = {
   id: string;
-  type: "like" | "comment" | "follow" | "portfolio_claimed" | "portfolio_claim_request";
+  type: "like" | "comment" | "follow" | "portfolio_claimed" | "portfolio_claim_request" | "featured" | "story_featured";
   unread: boolean;
   when: string;
   actorName: string;
@@ -48,8 +48,11 @@ export async function loadMenuNotifications(): Promise<MenuNotification[]> {
     comment: n.comment?.body ?? null,
     portfolioName: n.portfolio?.name ?? null,
     // Likes and comments are always on the recipient's own projects; Discover ones go to the admin page.
+    // A feature is written by the actor (Identify), so it lives under their username.
     href: n.type.startsWith("portfolio_")
       ? "/admin/discover"
+      : (n.type === "featured" || n.type === "story_featured") && n.project
+        ? projectHref(n.actor.username, n.project.slug)
       : n.type === "follow" || !n.project || !me?.username
         ? `/${n.actor.username}`
         : `${projectHref(me.username, n.project.slug)}${n.type === "comment" ? "#responses" : ""}`,

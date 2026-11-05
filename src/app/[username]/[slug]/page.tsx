@@ -15,8 +15,11 @@ import { LikeButton } from "@/components/like-button";
 import { Markdown } from "@/components/markdown";
 import { TagLink } from "@/components/tag-link";
 import { getFollowCounts, isFollowing } from "@/lib/follows";
+import { getFeatureSubject, sectionInfo, subjectHref, type FeatureSubject } from "@/lib/features";
+import { displayHost } from "@/lib/discover/site";
 import { RemoteImage } from "@/components/remote-image";
-import { publishProject } from "@/lib/project-actions";
+import { isAdmin } from "@/lib/discover/portfolios";
+import { publishProject, setStoryFeatured } from "@/lib/project-actions";
 import { SITE_NAME } from "@/lib/site";
 import { getCurrentUser } from "@/lib/profiles";
 import { formatDate, getProject, previewMarkdown, readingMinutes } from "@/lib/projects";
@@ -57,12 +60,15 @@ async function Project({ params }: Pick<PageProps<"/[username]/[slug]">, "params
   if (!project) notFound();
 
   const { userId } = await getCurrentUser(supabase);
-  const [liked, comments, counts, following, saved] = await Promise.all([
+  const [liked, comments, counts, following, saved, subject, admin] = await Promise.all([
     hasLiked(supabase, project.id, userId),
     getComments(supabase, project.id),
     getFollowCounts(supabase, project.author_id),
     isFollowing(supabase, userId, project.author_id),
     isBookmarked(supabase, userId, project.id),
+    // An Identify Discoveries feature: the person it's about (null once their listing is removed).
+    getFeatureSubject(supabase, project),
+    userId ? isAdmin(supabase) : false,
   ]);
   const isOwner = userId === project.author_id;
   const authorName = project.author.full_name || project.author.username;
@@ -100,6 +106,18 @@ async function Project({ params }: Pick<PageProps<"/[username]/[slug]">, "params
         </div>
       )}
 
+      {project.feature_section && (
+        <p className="mb-4 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs font-semibold tracking-[0.12em] uppercase">
+          <Link href="/discover/features" className="hover:underline">
+            {SITE_NAME} Discoveries
+          </Link>
+          <span className="text-muted">·</span>
+          <Link href={`/discover/features/${sectionInfo(project.feature_section).id}`} className="text-muted hover:text-foreground">
+            {sectionInfo(project.feature_section).label}
+          </Link>
+          {project.editors_pick && <span className="rounded-full bg-brand px-2 py-0.5 text-brand-ink">Editor&apos;s pick</span>}
+        </p>
+      )}
       <h1 className="text-[2rem] leading-[1.2] font-extrabold tracking-tight sm:text-[2.6rem]">{project.title}</h1>
       {project.summary && <p className="mt-3 text-xl text-muted sm:text-[1.35rem]">{project.summary}</p>}
 
@@ -114,6 +132,7 @@ async function Project({ params }: Pick<PageProps<"/[username]/[slug]">, "params
           <p className="text-sm text-muted">
             {readingMinutes(project.body_md)} min read
             {project.published_at && <> · {formatDate(project.published_at)}</>}
+            {project.featured_at && project.status === "published" && <span className="text-success"> · ✦ Featured</span>}
           </p>
         </div>
       </div>
@@ -127,6 +146,16 @@ async function Project({ params }: Pick<PageProps<"/[username]/[slug]">, "params
               <CommentIcon size={22} /> {comments.length}
             </a>
             <span className="ml-auto flex items-center gap-5">
+              {/* Admins pick what goes on the home feed's Featured tab. */}
+              {admin && (
+                <form action={setStoryFeatured}>
+                  <input type="hidden" name="id" value={project.id} />
+                  <input type="hidden" name="on" value={String(!project.featured_at)} />
+                  <button className="text-sm text-muted hover:text-foreground">
+                    {project.featured_at ? "Unfeature" : "Feature on home"}
+                  </button>
+                </form>
+              )}
               {isOwner && (
                 <Link href={`/${username}/${slug}/edit`} className="text-sm text-muted hover:text-foreground">
                   Edit project
@@ -152,7 +181,7 @@ async function Project({ params }: Pick<PageProps<"/[username]/[slug]">, "params
               rel="noopener noreferrer nofollow"
               className="rounded-full bg-foreground px-4 py-2 text-sm font-medium text-background"
             >
-              Live demo ↗
+              {subject || project.feature_section ? "See the work ↗" : "Live demo ↗"}
             </a>
           )}
           {project.repo_url && (
@@ -184,6 +213,8 @@ async function Project({ params }: Pick<PageProps<"/[username]/[slug]">, "params
       )}
       {project.status === "published" && !isOwner && <TrackView projectId={project.id} endMarkerId="read-end" />}
 
+      {subject && <CreatorCard subject={subject} authorName={authorName} workUrl={project.demo_url} />}
+
       {project.tags.length > 0 && (
         <ul className="mt-10 flex flex-wrap gap-2">
           {project.tags.map((tag) => (
@@ -211,7 +242,7 @@ async function Project({ params }: Pick<PageProps<"/[username]/[slug]">, "params
         <div className="mt-4 flex flex-wrap items-start justify-between gap-4">
           <div>
             <Link href={`/${project.author.username}`} className="text-2xl font-bold tracking-tight hover:underline">
-              Built by {authorName}
+              {subject || project.feature_section ? "Written by" : "Built by"} {authorName}
             </Link>
             <p className="mt-1 text-sm text-muted">
               {counts.followers} {counts.followers === 1 ? "follower" : "followers"} · {counts.following} following
@@ -249,6 +280,65 @@ async function Project({ params }: Pick<PageProps<"/[username]/[slug]">, "params
         />
       )}
     </article>
+  );
+}
+
+/** "The creator": who a Discoveries feature is about, and where their own work lives. */
+function CreatorCard({ subject, authorName, workUrl }: { subject: FeatureSubject; authorName: string; workUrl: string | null }) {
+  const href = subjectHref(subject);
+  const onIdentify = Boolean(subject.member?.username);
+  const name = subject.member?.full_name || subject.name;
+  // Their own site (for someone on Discover), or the project's link (for a member).
+  const work = subject.url ?? workUrl;
+  const host = work ? displayHost(work) : null;
+  const external = { target: "_blank", rel: "noopener noreferrer" };
+  return (
+    <section className="mt-12 rounded-2xl border border-line p-5 sm:p-6">
+      <p className="text-xs font-semibold tracking-[0.12em] text-muted uppercase">The creator</p>
+      <div className="mt-4 flex items-start gap-4">
+        <Link href={href} {...(onIdentify ? {} : external)} className="shrink-0">
+          <AuthorAvatar name={name} url={subject.member?.avatar_url ?? null} size={56} />
+        </Link>
+        <div className="min-w-0 flex-1">
+          <Link href={href} {...(onIdentify ? {} : external)} className="text-lg font-bold hover:underline">
+            {name}
+          </Link>
+          {subject.role && <p className="text-sm text-muted">{subject.role}</p>}
+          {subject.description && <p className="mt-2 line-clamp-3 text-sm">{subject.description}</p>}
+          <div className="mt-4 flex flex-wrap gap-2">
+            {work && (
+              <a href={work} {...external} className="rounded-full border border-foreground px-4 py-1.5 text-sm hover:bg-surface">
+                {host} ↗
+              </a>
+            )}
+            {onIdentify ? (
+              <Link href={href} className="rounded-full bg-brand px-4 py-1.5 text-sm font-medium text-brand-ink hover:opacity-90">
+                View their profile
+              </Link>
+            ) : (
+              subject.listingId && (
+                <Link href={`/discover/claim/${subject.listingId}`} className="rounded-full px-4 py-1.5 text-sm text-muted hover:text-foreground">
+                  Is this you? Claim your profile
+                </Link>
+              )
+            )}
+          </div>
+        </div>
+      </div>
+      <p className="mt-5 border-t border-line pt-4 text-xs text-muted">
+        Editorial feature by {authorName}.{" "}
+        {work && (
+          <>
+            {name}&apos;s original work lives at{" "}
+            <a href={work} {...external} className="underline">
+              {host}
+            </a>
+            ;{" "}
+          </>
+        )}
+        our commentary is our own.
+      </p>
+    </section>
   );
 }
 

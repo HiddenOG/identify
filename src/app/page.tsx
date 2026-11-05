@@ -1,4 +1,4 @@
-import { Suspense } from "react";
+import { Suspense, type ReactNode } from "react";
 import { cacheLife, cacheTag } from "next/cache";
 import Link from "next/link";
 import { AuthorAvatar } from "@/components/author-avatar";
@@ -12,10 +12,12 @@ import { LavaLamp, type LavaBlob } from "@/components/lava-lamp";
 import { ProjectCard } from "@/components/project-card";
 import { SetupNotice } from "@/components/setup-notice";
 import { TagLink } from "@/components/tag-link";
-import { getCachedPortfolios } from "@/lib/discover/cached";
+import { getCachedFeatures, getCachedPortfolios } from "@/lib/discover/cached";
+import { FeatureHero } from "@/components/discover/feature-card";
 import { getFollowingIds } from "@/lib/follows";
-import { isSignedInMember, PROFILES_TAG, toFullProfile, type FullProfile, type ProfileRow } from "@/lib/profiles";
-import { formatDate, getFeed, getTrending, projectHref, PROJECTS_TAG, topTags, type ProjectWithAuthor } from "@/lib/projects";
+import { getForYou } from "@/lib/for-you";
+import { getCurrentUser, isSignedInMember, PROFILES_TAG, toFullProfile, type FullProfile, type ProfileRow } from "@/lib/profiles";
+import { formatDate, getFeatured, getFeed, getTrending, projectHref, PROJECTS_TAG, topTags, type ProjectWithAuthor } from "@/lib/projects";
 import { FOOTER_LINKS, SITE_TAGLINE } from "@/lib/site";
 import { hasSupabaseEnv } from "@/lib/supabase/env";
 import { createPublicClient } from "@/lib/supabase/public";
@@ -36,11 +38,19 @@ async function getNewestProfiles() {
   return (data ?? []).map(toFullProfile);
 }
 
+/** Recent stories: Latest shows the first 30; For you ranks all of them per reader. */
 async function getCachedFeed() {
   "use cache";
   cacheLife("minutes");
   cacheTag(PROJECTS_TAG);
-  return getFeed(createPublicClient());
+  return getFeed(createPublicClient(), 100);
+}
+
+async function getCachedFeatured() {
+  "use cache";
+  cacheLife("minutes");
+  cacheTag(PROJECTS_TAG);
+  return getFeatured(createPublicClient());
 }
 
 async function getCachedTrending() {
@@ -51,15 +61,17 @@ async function getCachedTrending() {
 }
 
 export default async function Home() {
-  const [profiles, feed, trending] = hasSupabaseEnv
-    ? await Promise.all([getNewestProfiles(), getCachedFeed(), getCachedTrending()])
-    : [[], [], []];
+  const [profiles, pool, trending, picked] = hasSupabaseEnv
+    ? await Promise.all([getNewestProfiles(), getCachedFeed(), getCachedTrending(), getCachedFeatured()])
+    : [[], [], [], []];
+  const feed = pool.slice(0, 30);
   const tags = topTags(feed, 9);
   const mostLiked = feed
     .filter((p) => p.like_count > 0)
     .toSorted((a, b) => b.like_count - a.like_count)
     .slice(0, 3);
-  const featured = trending.length > 0 ? trending : feed;
+  // Like Medium: stories the editors featured. Until there are any, the best work lately.
+  const featured = picked.length > 0 ? picked : trending.length > 0 ? trending : feed;
   const noProjects = (
     <p className="py-8 text-muted">
       No projects yet.{" "}
@@ -68,6 +80,11 @@ export default async function Home() {
       </Link>
     </p>
   );
+
+  const cards = (projects: ProjectWithAuthor[]) =>
+    projects.length === 0 ? noProjects : projects.map((project) => <ProjectCard key={project.id} project={project} />);
+  const featuredTab = { id: "featured", label: "Featured", content: cards(featured) };
+  const latestTab = { id: "latest", label: "Latest", content: cards(feed) };
 
   return (
     <main>
@@ -87,21 +104,10 @@ export default async function Home() {
               <GetStarted />
             </Suspense>
             <DiscoverStrip />
-            <FeedTabs
-              tabs={[
-                {
-                  // Best work first: trending, or the newest projects while there's little activity.
-                  id: "featured",
-                  label: "Featured",
-                  content: featured.length === 0 ? noProjects : featured.map((project) => <ProjectCard key={project.id} project={project} />),
-                },
-                {
-                  id: "latest",
-                  label: "Latest",
-                  content: feed.length === 0 ? noProjects : feed.map((project) => <ProjectCard key={project.id} project={project} />),
-                },
-              ]}
-            />
+            {/* Visitors get Featured and Latest; members also get For you, first (needs their session). */}
+            <Suspense fallback={<FeedTabs tabs={[featuredTab, latestTab]} />}>
+              <HomeFeed pool={pool} tabs={[featuredTab, latestTab]} empty={noProjects} />
+            </Suspense>
           </section>
 
           <aside className="hidden w-[25rem] shrink-0 border-l border-line py-8 pl-8 lg:block">
@@ -141,6 +147,27 @@ export default async function Home() {
   );
 }
 
+type FeedTab = { id: string; label: string; content: ReactNode };
+
+async function HomeFeed({ pool, tabs, empty }: { pool: ProjectWithAuthor[]; tabs: FeedTab[]; empty: ReactNode }) {
+  const supabase = await createClient();
+  const { userId, profile } = await getCurrentUser(supabase);
+  if (!userId || !profile) return <FeedTabs tabs={tabs} />;
+
+  const { stories, tuned } = await getForYou(supabase, userId, pool);
+  const forYou = (
+    <>
+      {!tuned && (
+        <p className="mb-2 rounded-lg bg-surface px-4 py-3 text-sm text-muted">
+          Follow people and like or save stories, and this tab learns what you&apos;re into.
+        </p>
+      )}
+      {stories.length === 0 ? empty : stories.map((project) => <ProjectCard key={project.id} project={project} />)}
+    </>
+  );
+  return <FeedTabs tabs={[{ id: "for-you", label: "For you", content: forYou }, ...tabs]} />;
+}
+
 async function Landing() {
   if (hasSupabaseEnv && (await isSignedInMember(await createClient()))) return null;
 
@@ -171,8 +198,28 @@ async function Landing() {
 
 /** Above the feed for everyone: three portfolios from Discover, featured first. Cached, no cookies. */
 async function DiscoverStrip() {
-  const portfolios = await getCachedPortfolios();
-  if (portfolios.length === 0) return null;
+  const [portfolios, [pick]] = await Promise.all([getCachedPortfolios(), getCachedFeatures(undefined, 1)]);
+  if (portfolios.length === 0 && !pick) return null;
+  return (
+    <>
+      {/* The latest Editor's pick (or newest feature) from Identify Discoveries. */}
+      {pick && (
+        <section className="mb-12">
+          <div className="mb-4 flex items-baseline justify-between gap-4">
+            <h2 className="text-xl font-bold">{pick.editors_pick ? "Editor’s pick" : "From Discoveries"}</h2>
+            <Link href="/discover/features" className="shrink-0 text-sm font-medium text-success hover:underline">
+              More stories
+            </Link>
+          </div>
+          <FeatureHero feature={pick} />
+        </section>
+      )}
+      {portfolios.length > 0 && <PortfolioStrip portfolios={portfolios} />}
+    </>
+  );
+}
+
+function PortfolioStrip({ portfolios }: { portfolios: Awaited<ReturnType<typeof getCachedPortfolios>> }) {
   return (
     <section className="mb-12">
       <div className="mb-4 flex items-baseline justify-between gap-4">

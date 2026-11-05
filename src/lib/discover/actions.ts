@@ -121,6 +121,45 @@ export async function savePortfolio(_: ActionState, formData: FormData): Promise
   return { message: id ? "Saved." : `${fields.name} is listed.` };
 }
 
+/**
+ * Admins: lists someone new on Discover while writing a feature about them (the editor's
+ * "Someone new"). If their site is already listed, that listing is used instead.
+ */
+export async function listForFeature(input: {
+  url: string;
+  name: string;
+  role: string;
+  category: string;
+  description: string;
+  image_url: string;
+  email: string;
+}): Promise<{ id?: string; error?: string }> {
+  const supabase = await adminClient();
+  if (!supabase) return { error: "Admins only." };
+  const parsed = portfolioSchema.safeParse({ ...input, location: "", description: input.description.slice(0, 400) });
+  if (!parsed.success) return { error: parsed.error.issues[0].message };
+  let url: string;
+  try {
+    url = normalizeUrl(input.url);
+  } catch (error) {
+    return { error: error instanceof SiteError ? error.message : "Check their link." };
+  }
+
+  const { data: existing } = await supabase.from("portfolios").select("id").eq("url", url).maybeSingle<{ id: string }>();
+  if (existing) return { id: existing.id };
+
+  const { email, ...fields } = parsed.data;
+  const { data, error } = await supabase
+    .from("portfolios")
+    .insert({ ...fields, url, image_url: await storeImage(supabase, fields.image_url), status: "listed", listed_at: new Date().toISOString() })
+    .select("id")
+    .single<{ id: string }>();
+  if (error) return { error: error.message };
+  if (email) await supabase.from("portfolio_contacts").upsert({ portfolio_id: data.id, email }, { onConflict: "portfolio_id" });
+  updateTag(PORTFOLIOS_TAG);
+  return { id: data.id };
+}
+
 export async function setPortfolioStatus(_: ActionState, formData: FormData): Promise<ActionState> {
   const supabase = await adminClient();
   if (!supabase) return { error: "Admins only." };

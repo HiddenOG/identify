@@ -6,6 +6,8 @@ import Link from "next/link";
 import { Markdown } from "@/components/markdown";
 import { importGithubRepo } from "@/lib/import/github-action";
 import { saveProject, type SaveProjectState } from "@/lib/project-actions";
+import { FeaturePanel } from "@/components/feature-panel";
+import { FEATURE_OUTLINE, type AboutChoice } from "@/lib/features";
 import type { ProjectRow } from "@/lib/projects";
 import { LogoMark } from "@/components/logo";
 import { SITE_NAME } from "@/lib/site";
@@ -30,10 +32,19 @@ Describe the problem and what you built.
 
 const input = "w-full rounded-md border border-line px-3 py-2 outline-none focus:border-foreground";
 
-export function ProjectEditor({ userId, project }: { userId: string; project?: ProjectRow }) {
+export function ProjectEditor({
+  userId,
+  project,
+  editorial,
+}: {
+  userId: string;
+  project?: ProjectRow;
+  /** Admins only: the editorial panel, with who the story is about so far. */
+  editorial?: { initialAbout: AboutChoice | null };
+}) {
   const [state, action, pending] = useActionState<SaveProjectState, FormData>(saveProject, {});
   const published = project?.status === "published";
-  const [body, setBody] = useState(project?.body_md ?? STARTER);
+  const [body, setBody] = useState(project?.body_md ?? (editorial?.initialAbout ? FEATURE_OUTLINE : STARTER));
   const [tab, setTab] = useState<"write" | "preview">("write");
   const [cover, setCover] = useState(project?.cover_url ?? "");
   const [uploading, setUploading] = useState(false);
@@ -117,6 +128,19 @@ export function ProjectEditor({ userId, project }: { userId: string; project?: P
           {saveStatus && <span className="hidden text-sm text-muted sm:inline">{saveStatus}</span>}
         </div>
       </div>
+
+      {editorial && (
+        <FeaturePanel
+          project={project}
+          initialAbout={editorial.initialAbout}
+          body={body}
+          setBody={setBody}
+          starter={STARTER}
+          cover={cover}
+          setCover={setCover}
+          markDirty={() => setDirty(true)}
+        />
+      )}
 
       <div className="rounded-lg bg-surface p-4">
         <p className="mb-2 text-sm font-medium">Start from a GitHub repo</p>
