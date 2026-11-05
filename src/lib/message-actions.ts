@@ -2,7 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { z } from "zod";
-import type { Message } from "@/lib/messages";
+import { getChatPartners, type Message } from "@/lib/messages";
 import { createClient } from "@/lib/supabase/server";
 
 async function session() {
@@ -82,4 +82,69 @@ export async function markConversationRead(conversationId: string) {
     .eq("conversation_id", conversationId)
     .neq("sender_id", userId)
     .is("read_at", null);
+}
+
+export type ForwardTarget = { id: string; name: string; avatarUrl: string | null; headline: string | null };
+
+/** Your other chats, newest first, for the Forward picker. */
+export async function getForwardTargets(currentId: string): Promise<ForwardTarget[]> {
+  const { supabase, userId } = await session();
+  if (!userId) return [];
+  const partners = await getChatPartners(supabase, userId);
+  return partners
+    .filter((c) => c.conversationId !== currentId)
+    .map(({ conversationId, person }) => ({
+      id: conversationId,
+      name: person.full_name || person.username,
+      avatarUrl: person.avatar_url,
+      headline: person.headline,
+    }));
+}
+
+const forwardSchema = z.object({
+  fromId: z.uuid(),
+  messageIds: z.array(z.uuid()).min(1, "Pick a message to forward.").max(20, "Forward up to 20 messages at a time."),
+  toIds: z.array(z.uuid()).min(1, "Pick a chat to forward to.").max(10, "Forward to up to 10 chats at a time."),
+});
+
+/**
+ * Sends copies of messages (text and any photo or file) from one of your chats to others.
+ * RLS only returns messages and chats you're in; files are copied into each chat's own folder.
+ */
+export async function forwardMessages(fromId: string, messageIds: string[], toIds: string[]): Promise<{ forwarded?: number; error?: string }> {
+  const parsed = forwardSchema.safeParse({ fromId, messageIds, toIds });
+  if (!parsed.success) return { error: parsed.error.issues[0].message };
+  const { supabase, userId } = await session();
+  if (!userId) return { error: "Your session expired. Sign in again." };
+
+  const [{ data: messages }, { data: targets }] = await Promise.all([
+    supabase.from("messages").select("*").eq("conversation_id", fromId).in("id", parsed.data.messageIds).order("created_at").returns<Message[]>(),
+    supabase.from("conversations").select("id").in("id", parsed.data.toIds).returns<{ id: string }[]>(),
+  ]);
+  if (!messages?.length) return { error: "Those messages are no longer available." };
+  if (!targets?.length) return { error: "Pick a chat to forward to." };
+
+  let forwarded = 0;
+  for (const target of targets) {
+    for (const m of messages) {
+      let attachment: Pick<Message, "attachment_path" | "attachment_name" | "attachment_type" | "attachment_size"> = {};
+      if (m.attachment_path) {
+        const name = m.attachment_path.split("/").pop() ?? "file";
+        const path = `${target.id}/${userId}/${crypto.randomUUID()}-${name.replace(/^[0-9a-f-]{36}-/, "")}`;
+        const { error: copyError } = await supabase.storage.from("message-files").copy(m.attachment_path, path);
+        if (copyError) {
+          console.error("[messages.forwardMessages] copy", copyError.message);
+          return { error: "Couldn't forward a photo or file. Try again.", forwarded };
+        }
+        attachment = { attachment_path: path, attachment_name: m.attachment_name, attachment_type: m.attachment_type, attachment_size: m.attachment_size };
+      }
+      const { error } = await supabase.from("messages").insert({ conversation_id: target.id, sender_id: userId, body: m.body, ...attachment });
+      if (error) {
+        console.error("[messages.forwardMessages] insert", error.message);
+        return { error: "Couldn't forward. Try again.", forwarded };
+      }
+      forwarded++;
+    }
+  }
+  return { forwarded };
 }

@@ -44,6 +44,18 @@ const PEOPLE =
 
 type ConversationRow = { id: string; last_message_at: string; user_a: string; user_b: string; a: Person; b: Person };
 
+/** Everyone the signed-in user has a chat with, including chats opened but not written in yet. */
+export async function getChatPartners(supabase: SupabaseClient, me: string) {
+  const { data, error } = await supabase
+    .from("conversations")
+    .select(PEOPLE)
+    .order("last_message_at", { ascending: false })
+    .limit(100)
+    .returns<ConversationRow[]>();
+  if (error) console.error("[messages.getChatPartners]", error.message);
+  return (data ?? []).map((r) => ({ conversationId: r.id, person: r.user_a === me ? r.b : r.a }));
+}
+
 /** The signed-in user's conversations, newest first, with a preview and unread count each. */
 export async function getConversations(supabase: SupabaseClient, me: string): Promise<ConversationSummary[]> {
   const { data, error } = await supabase

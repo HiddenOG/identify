@@ -5,9 +5,10 @@ import { useEffect, useRef, useState, useTransition, type ClipboardEvent, type F
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AuthorAvatar } from "@/components/author-avatar";
+import { EmojiPicker } from "@/components/emoji-picker";
 import { PaperclipIcon, ReplyIcon, SmileIcon } from "@/components/icons";
 import { usePopover } from "@/components/use-popover";
-import { markConversationRead, sendMessage } from "@/lib/message-actions";
+import { forwardMessages, getForwardTargets, markConversationRead, sendMessage, type ForwardTarget } from "@/lib/message-actions";
 import type { Message, Person } from "@/lib/messages";
 import { createClient } from "@/lib/supabase/client";
 
@@ -22,11 +23,6 @@ const ACCEPT = [
   "application/msword", "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
   "application/vnd.ms-excel", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
   "application/vnd.ms-powerpoint", "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-];
-const EMOJI = [
-  "😀", "😂", "🥹", "😊", "😍", "🥰", "😎", "🤩", "🤔", "😅", "😭", "😮", "🙄", "😴", "🤝", "🙏",
-  "👍", "👎", "👏", "🙌", "💪", "👀", "🔥", "✨", "🎉", "💯", "❤️", "💙", "💚", "✅", "❌", "⚡",
-  "🚀", "💡", "📌", "📎", "💼", "📈", "🧠", "💻", "📱", "☕", "🍕", "🌍", "🇳🇬", "⏰", "🎯", "🏆",
 ];
 
 const time = (iso: string) => new Date(iso).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
@@ -53,6 +49,15 @@ export function Thread({ conversationId, me, other, initial }: Props) {
   const [error, setError] = useState("");
   const [sending, startSending] = useTransition();
   const [replyTo, setReplyTo] = useState<Message | null>(null);
+  // Selecting messages to copy or forward: hold one on a phone, or the ✓ button on a computer.
+  const [selected, setSelected] = useState<string[]>([]);
+  const selecting = selected.length > 0;
+  const [forwarding, setForwarding] = useState<{ targets: ForwardTarget[] | null; chosen: string[] } | null>(null);
+  const [forwardPending, startForward] = useTransition();
+  const [notice, setNotice] = useState("");
+  const press = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Lifting the finger after a long press fires a click; it must not undo the selection.
+  const swallowClick = useRef(false);
   const [file, setFile] = useState<{ file: File; preview: string | null } | null>(null);
   // Signed links for attachments, by storage path (or the local preview while sending).
   const [urls, setUrls] = useState<Record<string, string>>({});
@@ -137,15 +142,16 @@ export function Thread({ conversationId, me, other, initial }: Props) {
     }
   }
 
+  // Inserts at the cursor. The picker never takes focus, so if the keyboard was open it stays
+  // open, and if it was closed, tapping emoji doesn't pop it up.
   function insertEmoji(symbol: string) {
     const el = input.current;
     const start = el?.selectionStart ?? draft.length;
     const end = el?.selectionEnd ?? draft.length;
     setDraft((d) => d.slice(0, start) + symbol + d.slice(end));
-    requestAnimationFrame(() => {
-      el?.focus();
-      el?.setSelectionRange(start + symbol.length, start + symbol.length);
-    });
+    if (el && document.activeElement === el) {
+      requestAnimationFrame(() => el.setSelectionRange(start + symbol.length, start + symbol.length));
+    }
   }
 
   function send(e?: FormEvent) {
@@ -222,8 +228,77 @@ export function Thread({ conversationId, me, other, initial }: Props) {
 
   const urlFor = (path?: string | null) => (!path ? undefined : path.startsWith("local:") ? path.slice(6) : urls[path]);
 
+  const toggle = (id: string) => setSelected((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]));
+  const flash = (text: string) => {
+    setNotice(text);
+    setTimeout(() => setNotice(""), 3000);
+  };
+
+  // Holding a message on a touch screen selects it (like WhatsApp); moving or lifting cancels.
+  function startPress(id: string, pointerType: string) {
+    swallowClick.current = false; // a new touch: any click from here on is a real tap
+    if (pointerType !== "touch" || selecting || id.startsWith("temp-")) return;
+    press.current = setTimeout(() => {
+      setSelected([id]);
+      swallowClick.current = true;
+      navigator.vibrate?.(15);
+    }, 450);
+  }
+  function endPress() {
+    if (press.current) clearTimeout(press.current);
+    press.current = null;
+  }
+
+  // Selected messages in the order they were sent, not the order they were tapped.
+  const chosen = messages.filter((m) => selected.includes(m.id) && !m.id.startsWith("temp-"));
+
+  async function copySelected() {
+    const text = chosen
+      .map((m) => [m.attachment_path ? (isImage(m.attachment_type) ? "[Photo]" : `[File: ${m.attachment_name ?? "file"}]`) : "", m.body].filter(Boolean).join(" "))
+      .join("\n");
+    try {
+      await navigator.clipboard.writeText(text);
+      flash(chosen.length === 1 ? "Copied" : `Copied ${chosen.length} messages`);
+    } catch {
+      flash("Couldn't copy. Try again.");
+    }
+    setSelected([]);
+  }
+
+  function openForward() {
+    setForwarding({ targets: null, chosen: [] });
+    getForwardTargets(conversationId).then((targets) => setForwarding((f) => (f ? { ...f, targets } : f)));
+  }
+
+  function sendForward() {
+    if (!forwarding?.chosen.length) return;
+    const to = forwarding.chosen;
+    startForward(async () => {
+      const result = await forwardMessages(conversationId, chosen.map((m) => m.id), to);
+      setForwarding(null);
+      setSelected([]);
+      flash(result.error ?? `Forwarded to ${to.length} ${to.length === 1 ? "chat" : "chats"}`);
+    });
+  }
+
   return (
     <div className="flex h-full min-h-0 min-w-0 flex-col">
+      {selecting ? (
+        <header className="flex items-center gap-3 border-b border-line bg-surface px-3 py-3 sm:px-5">
+          <button type="button" onClick={() => setSelected([])} aria-label="Cancel selection" className="-ml-1 grid size-9 shrink-0 place-items-center text-lg text-muted hover:text-foreground">
+            ✕
+          </button>
+          <span className="font-medium">{selected.length} selected</span>
+          <span className="ml-auto flex gap-2">
+            <button type="button" onClick={copySelected} className="rounded-full border border-line bg-background px-4 py-1.5 text-sm hover:border-foreground">
+              Copy
+            </button>
+            <button type="button" onClick={openForward} className="rounded-full bg-foreground px-4 py-1.5 text-sm text-background hover:opacity-90">
+              Forward
+            </button>
+          </span>
+        </header>
+      ) : (
       <header className="flex items-center gap-3 border-b border-line px-3 py-3 sm:px-5">
         <Link href="/messages" className="-ml-2 grid size-9 shrink-0 place-items-center text-lg text-muted hover:text-foreground md:hidden" aria-label="Back to messages">
           ←
@@ -239,6 +314,13 @@ export function Thread({ conversationId, me, other, initial }: Props) {
           View CV
         </Link>
       </header>
+      )}
+
+      {notice && (
+        <p role="status" className="mx-auto mt-2 rounded-full bg-foreground px-4 py-1.5 text-sm text-background">
+          {notice}
+        </p>
+      )}
 
       <div className="min-h-0 flex-1 overflow-y-auto px-3 py-6 sm:px-5" aria-live="polite">
         {messages.length === 0 && (
@@ -258,9 +340,29 @@ export function Thread({ conversationId, me, other, initial }: Props) {
                     {day(m.created_at)}
                   </p>
                 )}
-                <div className={`group flex items-center gap-1 ${mine ? "flex-row-reverse" : ""}`}>
+                <div
+                  className={`group -mx-2 flex items-center gap-1 rounded-xl px-2 py-0.5 ${mine ? "flex-row-reverse" : ""} ${selected.includes(m.id) ? "bg-brand/25" : ""} ${selecting ? "cursor-pointer" : ""}`}
+                  onClickCapture={(e) => {
+                    // While selecting, a tap selects instead of opening links or photos.
+                    if (swallowClick.current) {
+                      swallowClick.current = false;
+                      e.preventDefault();
+                      e.stopPropagation();
+                      return;
+                    }
+                    if (!selecting || m.id.startsWith("temp-")) return;
+                    e.preventDefault();
+                    e.stopPropagation();
+                    toggle(m.id);
+                  }}
+                  onPointerDown={(e) => startPress(m.id, e.pointerType)}
+                  onPointerUp={endPress}
+                  onPointerLeave={endPress}
+                  onPointerMove={(e) => (Math.abs(e.movementX) + Math.abs(e.movementY) > 6 ? endPress() : undefined)}
+                  onContextMenu={(e) => selecting && e.preventDefault()}
+                >
                   <div
-                    className={`max-w-[80%] min-w-0 rounded-2xl px-3 py-2 ${mine ? "rounded-br-md bg-foreground text-background" : "rounded-bl-md bg-surface"} ${m.id.startsWith("temp-") ? "opacity-60" : ""}`}
+                    className={`max-w-[80%] min-w-0 rounded-2xl px-3 py-2 select-text ${mine ? "rounded-br-md bg-foreground text-background" : "rounded-bl-md bg-surface"} ${m.id.startsWith("temp-") ? "opacity-60" : ""}`}
                   >
                     {m.reply_to && (
                       <a
@@ -300,18 +402,40 @@ export function Thread({ conversationId, me, other, initial }: Props) {
                       {mine && m.read_at && " · Seen"}
                     </p>
                   </div>
-                  {!m.id.startsWith("temp-") && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setReplyTo(m);
-                        input.current?.focus();
-                      }}
-                      aria-label="Reply to this message"
-                      className="grid size-8 shrink-0 place-items-center rounded-full text-muted opacity-0 transition group-hover:opacity-100 hover:bg-surface hover:text-foreground focus:opacity-100 [@media(hover:none)]:opacity-60"
+                  {!m.id.startsWith("temp-") && !selecting && (
+                    <span className={`flex shrink-0 items-center ${mine ? "flex-row-reverse" : ""}`}>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setReplyTo(m);
+                          input.current?.focus();
+                        }}
+                        aria-label="Reply to this message"
+                        className="grid size-8 place-items-center rounded-full text-muted opacity-0 transition group-hover:opacity-100 hover:bg-surface hover:text-foreground focus:opacity-100 [@media(hover:none)]:opacity-60"
+                      >
+                        <ReplyIcon size={16} />
+                      </button>
+                      {/* Phones select by holding a message, so this is for mouse users. */}
+                      <button
+                        type="button"
+                        onClick={() => setSelected([m.id])}
+                        aria-label="Select to copy or forward"
+                        className="hidden size-8 place-items-center rounded-full text-muted opacity-0 transition group-hover:opacity-100 hover:bg-surface hover:text-foreground focus:opacity-100 [@media(hover:hover)]:grid"
+                      >
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden>
+                          <circle cx="12" cy="12" r="8.5" />
+                          <path d="m8.5 12.2 2.4 2.4 4.6-4.9" />
+                        </svg>
+                      </button>
+                    </span>
+                  )}
+                  {selecting && !m.id.startsWith("temp-") && (
+                    <span
+                      aria-hidden
+                      className={`grid size-5 shrink-0 place-items-center rounded-full border text-[11px] ${selected.includes(m.id) ? "border-success bg-success text-background" : "border-line"}`}
                     >
-                      <ReplyIcon size={16} />
-                    </button>
+                      {selected.includes(m.id) ? "✓" : ""}
+                    </span>
                   )}
                 </div>
               </li>
@@ -382,6 +506,7 @@ export function Thread({ conversationId, me, other, initial }: Props) {
           <div ref={emojiRoot} className="relative shrink-0">
             <button
               type="button"
+              onPointerDown={(e) => e.preventDefault()} // don't steal focus from the message box
               onClick={() => setEmojiOpen((o) => !o)}
               aria-label="Add an emoji"
               aria-expanded={emojiOpen}
@@ -390,12 +515,8 @@ export function Thread({ conversationId, me, other, initial }: Props) {
               <SmileIcon size={20} />
             </button>
             {emojiOpen && (
-              <div className="absolute bottom-11 left-0 z-30 grid w-[17rem] grid-cols-8 gap-0.5 rounded-xl border border-line bg-background p-2 shadow-[0_8px_30px_rgb(0_0_0/0.18)]">
-                {EMOJI.map((e) => (
-                  <button key={e} type="button" onClick={() => insertEmoji(e)} className="grid size-8 place-items-center rounded-md text-lg hover:bg-surface">
-                    {e}
-                  </button>
-                ))}
+              <div className="absolute bottom-11 -left-10 z-30 sm:left-0">
+                <EmojiPicker onPick={insertEmoji} onClose={() => setEmojiOpen(false)} />
               </div>
             )}
           </div>
@@ -420,6 +541,67 @@ export function Thread({ conversationId, me, other, initial }: Props) {
         </div>
         <p className="mt-1 hidden px-2 text-xs text-muted md:block">Enter to send · Shift+Enter for a new line · Paste a screenshot to attach it</p>
       </form>
+
+      {forwarding && (
+        <div className="fixed inset-0 z-50 bg-foreground/40" onClick={() => !forwardPending && setForwarding(null)}>
+          <div
+            role="dialog"
+            aria-label="Forward messages"
+            onClick={(e) => e.stopPropagation()}
+            className="absolute inset-x-0 bottom-0 flex max-h-[80dvh] flex-col rounded-t-2xl bg-background p-4 sm:inset-x-auto sm:top-1/2 sm:bottom-auto sm:left-1/2 sm:w-[26rem] sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-2xl"
+          >
+            <h2 className="text-lg font-bold">
+              Forward {chosen.length} {chosen.length === 1 ? "message" : "messages"}
+            </h2>
+            <p className="mb-3 text-sm text-muted">Pick one or more chats. Photos and files go too.</p>
+            <div className="min-h-0 flex-1 overflow-y-auto">
+              {forwarding.targets === null ? (
+                <p className="py-6 text-center text-sm text-muted">Loading your chats…</p>
+              ) : forwarding.targets.length === 0 ? (
+                <p className="py-6 text-center text-sm text-muted">No other chats yet. Start one with Message on someone&apos;s profile.</p>
+              ) : (
+                <ul className="space-y-1">
+                  {forwarding.targets.map((t) => {
+                    const on = forwarding.chosen.includes(t.id);
+                    return (
+                      <li key={t.id}>
+                        <label className={`flex cursor-pointer items-center gap-3 rounded-lg px-2 py-2 ${on ? "bg-surface" : "hover:bg-surface"}`}>
+                          <input
+                            type="checkbox"
+                            checked={on}
+                            onChange={() =>
+                              setForwarding((f) => f && { ...f, chosen: on ? f.chosen.filter((x) => x !== t.id) : [...f.chosen, t.id] })
+                            }
+                            className="size-4 accent-foreground"
+                          />
+                          <AuthorAvatar name={t.name} url={t.avatarUrl} size={36} />
+                          <span className="min-w-0">
+                            <span className="block truncate font-medium">{t.name}</span>
+                            {t.headline && <span className="block truncate text-xs text-muted">{t.headline}</span>}
+                          </span>
+                        </label>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </div>
+            <div className="mt-4 flex justify-end gap-2 border-t border-line pt-3">
+              <button type="button" onClick={() => setForwarding(null)} disabled={forwardPending} className="rounded-full px-4 py-1.5 text-sm text-muted hover:text-foreground">
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={sendForward}
+                disabled={!forwarding.chosen.length || forwardPending}
+                className="rounded-full bg-foreground px-5 py-1.5 text-sm text-background disabled:opacity-40"
+              >
+                {forwardPending ? "Forwarding…" : forwarding.chosen.length > 1 ? `Forward to ${forwarding.chosen.length}` : "Forward"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
