@@ -2,7 +2,7 @@
 
 import { useLayoutEffect, type ReactNode } from "react";
 import { usePathname } from "next/navigation";
-import { DESKTOP_QUERY, hasSessionCookie, isDockedPath, isLandingPage, shouldOpen, SIDEBAR_KEY } from "@/lib/sidebar";
+import { AUTH_SEEN_KEY, DESKTOP_QUERY, hasSessionCookie, isDockedPath, isLandingPage, shouldOpen, SIDEBAR_KEY } from "@/lib/sidebar";
 
 // Open/closed and docked/undocked live on <html> (data-sidebar, data-docked) so CSS alone decides
 // what is visible: the inline script in app/layout.tsx sets them before paint, SidebarSync on navigation.
@@ -72,8 +72,15 @@ const MOTION = "duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]";
 export function AuthMark({ signedIn }: { signedIn: boolean }) {
   useLayoutEffect(() => {
     const html = document.documentElement;
-    // "out" here means this is a fresh sign-in (the page was showing a visitor a moment ago).
-    const justSignedIn = signedIn && html.getAttribute("data-auth") !== "in";
+    // A fresh sign-in: this browser was last seen signed out (or never seen). Remembered in storage,
+    // because after a Google redirect or a client navigation the page may already say "in".
+    let justSignedIn = false;
+    try {
+      justSignedIn = signedIn && localStorage.getItem(AUTH_SEEN_KEY) !== "in";
+      localStorage.setItem(AUTH_SEEN_KEY, signedIn ? "in" : "out");
+    } catch {
+      // Storage blocked: the sidebar follows the usual default.
+    }
     html.dataset.authVerified = signedIn ? "in" : "out";
     html.setAttribute("data-auth", signedIn ? "in" : "out");
     html.setAttribute("data-landing", isLandingPage(location.pathname, signedIn) ? "true" : "false");

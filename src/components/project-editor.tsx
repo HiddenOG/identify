@@ -62,17 +62,21 @@ export function ProjectEditor({
   const [repoUrl, setRepoUrl] = useState("");
   const [importing, startImporting] = useTransition();
   const [importMessage, setImportMessage] = useState<{ kind: "ok" | "error"; text: string } | null>(null);
-  // Cover from a link: an image address or a website's preview picture.
-  const [coverLink, setCoverLink] = useState("");
+  // The Live demo link doubles as the cover's source: its site's preview picture (or the image itself).
+  const [demoUrl, setDemoUrl] = useState(project?.demo_url ?? "");
   const [fetchingCover, startFetchingCover] = useTransition();
+  // The last link tried automatically, so leaving the field again doesn't refetch the same one.
+  const [autoTried, setAutoTried] = useState("");
+  const demoLink = /^https?:\/\/\S+\.\S+/i.test(demoUrl.trim()) ? demoUrl.trim() : "";
 
-  function applyCoverLink() {
+  function coverFromDemo(link = demoLink) {
+    if (!link) return;
     setUploadError("");
+    setAutoTried(link);
     startFetchingCover(async () => {
-      const { url, error } = await coverFromLink(coverLink);
-      if (!url) return setUploadError(error ?? "Couldn't use that link.");
+      const { url, error } = await coverFromLink(link);
+      if (!url) return setUploadError(error ?? "Couldn't get a picture from that link. Upload one instead.");
       setCover(url);
-      setCoverLink("");
       setDirty(true);
     });
   }
@@ -97,6 +101,7 @@ export function ProjectEditor({
         tags: draft.tags.join(", "),
       });
       setBody(draft.body_md || STARTER);
+      setDemoUrl(draft.demo_url);
       setCover(draft.cover_url);
       setFieldsKey((k) => k + 1);
       setDirty(true);
@@ -244,29 +249,18 @@ export function ProjectEditor({
                 onChange={(e) => e.target.files?.[0] && uploadCover(e.target.files[0])}
               />
             </label>
-            <div className="mt-3 flex gap-2">
-              <input
-                value={coverLink}
-                onChange={(e) => setCoverLink(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    e.preventDefault();
-                    if (coverLink.trim()) applyCoverLink();
-                  }
-                }}
-                placeholder="Or paste a website or image link to use its picture"
-                aria-label="Cover image from a link"
-                className={input}
-              />
+            {demoLink ? (
               <button
                 type="button"
-                onClick={applyCoverLink}
-                disabled={fetchingCover || !coverLink.trim()}
-                className="shrink-0 rounded-full bg-foreground px-4 py-2 text-sm font-medium text-background disabled:opacity-50"
+                onClick={() => coverFromDemo()}
+                disabled={fetchingCover}
+                className="mt-2 text-sm text-success underline disabled:no-underline disabled:opacity-60"
               >
-                {fetchingCover ? "Getting…" : "Use picture"}
+                {fetchingCover ? "Getting the picture…" : "Use the picture from your Live demo link"}
               </button>
-            </div>
+            ) : (
+              <p className="mt-2 text-xs text-muted">Or add a Live demo link below and its site&apos;s picture is used.</p>
+            )}
           </>
         )}
         {uploadError && <p className="mt-2 text-sm text-danger">{uploadError}</p>}
@@ -275,7 +269,17 @@ export function ProjectEditor({
       <div className="grid gap-4 sm:grid-cols-2">
         <label className="block">
           <span className="mb-1 block text-sm font-medium">Live demo URL</span>
-          <input key={`demo-${fieldsKey}`} name="demo_url" type="url" defaultValue={defaults.demo_url} placeholder="https://" className={input} />
+          <input
+            key={`demo-${fieldsKey}`}
+            name="demo_url"
+            type="url"
+            defaultValue={defaults.demo_url}
+            onChange={(e) => setDemoUrl(e.target.value)}
+            // No cover yet: use the site's picture as soon as the link is in.
+            onBlur={() => !cover && demoLink && demoLink !== autoTried && coverFromDemo()}
+            placeholder="https://"
+            className={input}
+          />
         </label>
         <label className="block">
           <span className="mb-1 block text-sm font-medium">Repository URL</span>
