@@ -52,6 +52,9 @@ export type ProjectRow = {
   editors_pick?: boolean;
   /** When an admin put it on the home feed's Featured tab (Medium-style); null if not featured. */
   featured_at?: string | null;
+  /** Admins' "Tell all members" box, and when that went out (once per story). */
+  notify_members?: boolean;
+  broadcast_at?: string | null;
 };
 
 export type ProjectAuthor = { username: string; full_name: string | null; avatar_url: string | null };

@@ -40,7 +40,7 @@ export function ProjectEditor({
   userId: string;
   project?: ProjectRow;
   /** Admins only: the editorial panel, with who the story is about so far. */
-  editorial?: { initialAbout: AboutChoice | null };
+  editorial?: { initialAbout: AboutChoice | null; notifyByDefault: boolean };
 }) {
   const [state, action, pending] = useActionState<SaveProjectState, FormData>(saveProject, {});
   const published = project?.status === "published";
@@ -153,6 +153,7 @@ export function ProjectEditor({
         <FeaturePanel
           project={project}
           initialAbout={editorial.initialAbout}
+          notifyByDefault={editorial.notifyByDefault}
           body={body}
           setBody={setBody}
           starter={STARTER}

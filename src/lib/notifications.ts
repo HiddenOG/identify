@@ -3,7 +3,7 @@ import type { ProjectAuthor } from "@/lib/projects";
 
 export type NotificationRow = {
   id: string;
-  type: "like" | "comment" | "follow" | "portfolio_claimed" | "portfolio_claim_request" | "featured" | "story_featured";
+  type: "like" | "comment" | "follow" | "portfolio_claimed" | "portfolio_claim_request" | "featured" | "story_featured" | "identify_story";
   read_at: string | null;
   created_at: string;
   actor: ProjectAuthor;

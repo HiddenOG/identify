@@ -31,6 +31,7 @@ async function Account() {
       name={profile.full_name || profile.username}
       avatarUrl={profile.avatar_url}
       openToWork={profile.open_to_work}
+      emailUpdates={profile.email_updates !== false}
       hasPassword={providers.includes("email")}
       joined={profile.created_at}
     />

@@ -5,6 +5,7 @@ import { ProjectEditor } from "@/components/project-editor";
 import { isAdmin } from "@/lib/discover/portfolios";
 import { getAboutChoice } from "@/lib/features";
 import { getCurrentUser } from "@/lib/profiles";
+import { IDENTIFY_USERNAME } from "@/lib/site";
 import { createClient } from "@/lib/supabase/server";
 
 export const metadata: Metadata = { title: "New story" };
@@ -27,7 +28,10 @@ async function NewProject({ searchParams }: Pick<PageProps<"/new">, "searchParam
   // Admins get the editorial panel; ?about=<listing> comes from "Write a feature" in Discover admin.
   const { about } = await searchParams;
   const editorial = (await isAdmin(supabase))
-    ? { initialAbout: typeof about === "string" ? await getAboutChoice(supabase, { about_portfolio: about }) : null }
+    ? {
+        initialAbout: typeof about === "string" ? await getAboutChoice(supabase, { about_portfolio: about }) : null,
+        notifyByDefault: profile.username === IDENTIFY_USERNAME,
+      }
     : undefined;
   return <ProjectEditor userId={userId} editorial={editorial} />;
 }

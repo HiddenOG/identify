@@ -29,7 +29,7 @@ async function EditProject({ params }: Pick<PageProps<"/[username]/[slug]/edit">
 
   const project = await getProject(supabase, username, slug);
   if (!project || project.author_id !== userId) notFound();
-  const editorial = (await isAdmin(supabase)) ? { initialAbout: await getAboutChoice(supabase, project) } : undefined;
+  const editorial = (await isAdmin(supabase)) ? { initialAbout: await getAboutChoice(supabase, project), notifyByDefault: false } : undefined;
 
   return (
     <>

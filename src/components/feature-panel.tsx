@@ -18,6 +18,7 @@ const input = "w-full rounded-md border border-line bg-background px-3 py-2 outl
 export function FeaturePanel({
   project,
   initialAbout,
+  notifyByDefault,
   body,
   setBody,
   starter,
@@ -28,6 +29,8 @@ export function FeaturePanel({
   project?: ProjectRow;
   /** Who the story is already about, or the listing from "Write a feature" in Discover admin. */
   initialAbout: AboutChoice | null;
+  /** Tick "Tell all members" on new stories (posting as the Identify account). */
+  notifyByDefault: boolean;
   body: string;
   setBody: (body: string) => void;
   starter: string;
@@ -254,6 +257,21 @@ export function FeaturePanel({
             Editor&apos;s pick (leads Discoveries and the home page)
           </label>
         </div>
+      </div>
+
+      {/* 4. Tell everyone: a bell notification for every member, plus an email unless they turned those off. */}
+      <div className="mt-4 border-t border-brand/40 pt-3 text-sm">
+        {project?.broadcast_at ? (
+          <p className="text-muted">✓ Every member was told about this story when it was published.</p>
+        ) : (
+          <label className="flex items-start gap-2">
+            <input type="checkbox" name="notify_members" defaultChecked={project ? project.notify_members : notifyByDefault} className="mt-1" />
+            <span>
+              Tell all members when it&apos;s published: a notification, plus an email to everyone who hasn&apos;t turned story emails
+              off. Sent once.
+            </span>
+          </label>
+        )}
       </div>
 
       {editorial && (

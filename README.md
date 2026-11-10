@@ -26,7 +26,7 @@ Without Supabase keys the app still runs: `/preview/classic` shows the CV templa
    then `20261101000000_history.sql` (Library → History),
    then `20261102000000_discover.sql` (Discover listings, claims, removals). To manage Discover at `/admin/discover`,
    make yourself an admin once: `insert into public.admins (user_id) select id from auth.users where email = 'you@example.com';`
-   The later files add Discover activity, claim notes, message replies/attachments and `20261108000000_discoveries.sql` + `20261109000000_discoveries_members.sql` + `20261110000000_editorial.sql`
+   The later files add Discover activity, claim notes, message replies/attachments and `20261108000000_discoveries.sql` + `20261109000000_discoveries_members.sql` + `20261110000000_editorial.sql` + `20261111000000_story_broadcast.sql`
    (editorial features about people on Discover); run every file in the folder, in name order.
    (Or with the CLI: `npx supabase link --project-ref <ref>` then `npx supabase db push`.)
 4. **Authentication → URL Configuration**:

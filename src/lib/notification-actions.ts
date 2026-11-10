@@ -7,7 +7,7 @@ import { relativeTime } from "@/lib/time";
 
 export type MenuNotification = {
   id: string;
-  type: "like" | "comment" | "follow" | "portfolio_claimed" | "portfolio_claim_request" | "featured" | "story_featured";
+  type: "like" | "comment" | "follow" | "portfolio_claimed" | "portfolio_claim_request" | "featured" | "story_featured" | "identify_story";
   unread: boolean;
   when: string;
   actorName: string;
@@ -51,7 +51,7 @@ export async function loadMenuNotifications(): Promise<MenuNotification[]> {
     // A feature is written by the actor (Identify), so it lives under their username.
     href: n.type.startsWith("portfolio_")
       ? "/admin/discover"
-      : (n.type === "featured" || n.type === "story_featured") && n.project
+      : (n.type === "featured" || n.type === "story_featured" || n.type === "identify_story") && n.project
         ? projectHref(n.actor.username, n.project.slug)
       : n.type === "follow" || !n.project || !me?.username
         ? `/${n.actor.username}`

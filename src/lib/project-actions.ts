@@ -1,12 +1,16 @@
 "use server";
 
 import { refresh, updateTag } from "next/cache";
+import { after } from "next/server";
 import { redirect } from "next/navigation";
 import { listForFeature } from "@/lib/discover/actions";
 import { fetchImage, readSitePreview, SiteError } from "@/lib/discover/site";
 import { isAdmin, PORTFOLIOS_TAG } from "@/lib/discover/portfolios";
 import { isFeatureSection } from "@/lib/features";
+import { sendEmails } from "@/lib/email";
 import { getCurrentUser } from "@/lib/profiles";
+import { SITE_URL } from "@/lib/site";
+import { EMAIL_SETTINGS_URL, storyHtml, storySubject, storyText } from "@/lib/story-email";
 import { PROJECTS_TAG, projectHref, projectInputSchema, slugify } from "@/lib/projects";
 import { createClient } from "@/lib/supabase/server";
 
@@ -30,7 +34,7 @@ async function uniqueSlug(supabase: Awaited<ReturnType<typeof createClient>>, au
 
 const UUID = /^[0-9a-f-]{36}$/i;
 
-type Editorial = { portfolio: string | null; member: string | null; section: string | null; pick: boolean; featured: boolean };
+type Editorial = { portfolio: string | null; member: string | null; section: string | null; pick: boolean; featured: boolean; notify: boolean };
 
 /**
  * Reads the editor's admin-only editorial panel: who it's about ("l:<listing>", "m:<member>",
@@ -48,6 +52,7 @@ async function resolveEditorial(
     section: isFeatureSection(section) ? section : null,
     pick: formData.get("editors_pick") === "on",
     featured: formData.get("featured_home") === "on",
+    notify: formData.get("notify_members") === "on",
   };
 
   if (about.startsWith("l:") && UUID.test(about.slice(2))) return { portfolio: about.slice(2), member: null, ...choices };
@@ -66,6 +71,41 @@ async function resolveEditorial(
     return id ? { portfolio: id, member: null, ...choices } : { error: error ?? "Couldn't add them to Discover." };
   }
   return { portfolio: null, member: null, ...choices };
+}
+
+/**
+ * "Tell all members": once a story with that box ticked is published, the database writes a bell
+ * notification for every member and returns who wants the email; the emails go out after the
+ * response (Resend), so publishing isn't held up. Runs once per story; a no-op otherwise.
+ */
+async function broadcastStory(supabase: Awaited<ReturnType<typeof createClient>>, projectId: string, author: string) {
+  const { data, error } = await supabase.rpc("broadcast_story", { target: projectId });
+  const recipients = (data ?? []) as { email: string; name: string }[];
+  if (error) {
+    console.error("[projects.broadcastStory]", error.message);
+    return;
+  }
+  if (!recipients.length) return;
+  const { data: story } = await supabase
+    .from("projects")
+    .select("slug, title, summary, cover_url, author:profiles!projects_author_id_fkey(username)")
+    .eq("id", projectId)
+    .single<{ slug: string; title: string; summary: string | null; cover_url: string | null; author: { username: string } }>();
+  if (!story) return;
+
+  const email = { title: story.title, summary: story.summary, coverUrl: story.cover_url, url: `${SITE_URL}${projectHref(story.author.username, story.slug)}`, author };
+  after(async () => {
+    const sent = await sendEmails(
+      recipients.map((r) => ({
+        to: r.email,
+        subject: storySubject(email),
+        html: storyHtml(email, r.name),
+        text: storyText(email, r.name),
+        headers: { "List-Unsubscribe": `<${EMAIL_SETTINGS_URL}>` },
+      })),
+    );
+    console.log(`[projects.broadcastStory] emailed ${sent} of ${recipients.length} members about "${story.title}"`);
+  });
 }
 
 export async function saveProject(_: SaveProjectState, formData: FormData): Promise<SaveProjectState> {
@@ -127,12 +167,19 @@ export async function saveProject(_: SaveProjectState, formData: FormData): Prom
   }
 
   if (editorial) {
-    const { error } = await supabase.rpc("set_project_editorial", { target: projectId, ...editorial });
+    const { notify, ...choices } = editorial;
+    const { error } = await supabase.rpc("set_project_editorial", { target: projectId, ...choices });
     if (error) {
       console.error("[projects.saveProject] editorial", error.message);
       return { error: "Saved, but the editorial choices didn't save. Has the 20261110000000_editorial migration been run?" };
     }
+    const { error: notifyError } = await supabase.rpc("set_notify_members", { target: projectId, notify });
+    if (notifyError) {
+      console.error("[projects.saveProject] notify", notifyError.message);
+      return { error: "Saved, but \"Tell all members\" didn't save. Has the 20261111000000_story_broadcast migration been run?" };
+    }
     updateTag(PORTFOLIOS_TAG);
+    if (publish) await broadcastStory(supabase, projectId, profile.full_name || profile.username);
   }
 
   updateTag(PROJECTS_TAG);
@@ -160,6 +207,7 @@ export async function publishProject(formData: FormData) {
     .from("projects")
     .update({ status: "published", published_at: project.published_at ?? new Date().toISOString() })
     .eq("id", id);
+  if (await isAdmin(supabase)) await broadcastStory(supabase, id, profile.full_name || profile.username);
   updateTag(PROJECTS_TAG);
   redirect(projectHref(profile.username, project.slug));
 }

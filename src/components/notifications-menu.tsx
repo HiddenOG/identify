@@ -12,6 +12,7 @@ function Describe({ n }: { n: MenuNotification }) {
   const listing = <span className="text-foreground">{n.portfolioName ?? "a Discover listing"}</span>;
   if (n.type === "portfolio_claimed") return <>claimed their Discover listing, {listing} 🎉</>;
   if (n.type === "portfolio_claim_request") return <>asked to claim {listing}. Review it in Discover admin</>;
+  if (n.type === "identify_story") return <>published a new story: {title ?? "read it now"}</>;
   if (n.type === "story_featured") return <>featured {title ?? "your story"} on the home page ✦</>;
   if (n.type === "featured") return <>wrote about your work: {title ?? "a new feature"} ✨</>;
   if (n.type === "follow") return <>followed you</>;

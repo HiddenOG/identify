@@ -8,6 +8,7 @@ import { formatDate } from "@/lib/projects";
 import { SITE_NAME } from "@/lib/site";
 import {
   deleteAccount,
+  setEmailUpdates,
   setOpenToWork,
   signOutEverywhere,
   updateEmail,
@@ -22,6 +23,7 @@ type Props = {
   name: string;
   avatarUrl: string | null;
   openToWork: boolean;
+  emailUpdates: boolean;
   hasPassword: boolean;
   joined: string;
 };
@@ -160,6 +162,39 @@ function DeleteForm({ username, close }: { username: string; close: () => void }
   );
 }
 
+function EmailUpdatesToggle({ initial }: { initial: boolean }) {
+  const [on, setOn] = useState(initial);
+  const [pending, startTransition] = useTransition();
+  const [state, setState] = useState<AccountState>({});
+  return (
+    <div>
+      <Row
+        title="Story emails"
+        description={`An email when ${SITE_NAME} publishes a new story. You'll still see them in notifications either way.`}
+        aside={
+          <input
+            type="checkbox"
+            checked={on}
+            disabled={pending}
+            aria-label="Story emails"
+            onChange={(e) => {
+              const next = e.target.checked;
+              setOn(next);
+              startTransition(async () => {
+                const result = await setEmailUpdates(next);
+                if (result.error) setOn(!next);
+                setState(result);
+              });
+            }}
+            className="size-5 accent-foreground"
+          />
+        }
+      />
+      <Feedback state={state} />
+    </div>
+  );
+}
+
 function OpenToWorkToggle({ initial }: { initial: boolean }) {
   const [on, setOn] = useState(initial);
   const [pending, startTransition] = useTransition();
@@ -193,7 +228,7 @@ function OpenToWorkToggle({ initial }: { initial: boolean }) {
   );
 }
 
-export function AccountSettings({ email, username, name, avatarUrl, openToWork, hasPassword, joined }: Props) {
+export function AccountSettings({ email, username, name, avatarUrl, openToWork, emailUpdates, hasPassword, joined }: Props) {
   return (
     <div className="max-w-3xl">
       <Section title="Profile">
@@ -230,6 +265,13 @@ export function AccountSettings({ email, username, name, avatarUrl, openToWork, 
           <Row title="See who's open to work" description="Browse the people directory with recruiter filters." aside={<ArrowIcon />} />
         </Link>
       </Section>
+
+      {/* Linked from every story email ("Turn off story emails"). */}
+      <div id="emails" className="scroll-mt-20">
+        <Section title="Emails">
+          <EmailUpdatesToggle initial={emailUpdates} />
+        </Section>
+      </div>
 
       <Section title="Security">
         <EditRow

@@ -85,6 +85,20 @@ function Describe({ n, username }: { n: NotificationRow; username: string }) {
   if (n.type === "portfolio_claimed") return <>claimed their Discover listing, {listing}. 🎉</>;
   if (n.type === "portfolio_claim_request") return <>asked to claim {listing}. Review it in Discover admin.</>;
   if (n.type === "follow") return <>started following you.</>;
+  if (n.type === "identify_story")
+    return (
+      <>
+        published a new story:{" "}
+        {n.project ? (
+          <Link href={projectHref(n.actor.username, n.project.slug)} className="font-medium underline">
+            {n.project.title}
+          </Link>
+        ) : (
+          "read it now"
+        )}
+        .
+      </>
+    );
   if (n.type === "story_featured")
     return (
       <>

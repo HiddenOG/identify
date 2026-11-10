@@ -39,6 +39,8 @@ export type ProfileRow = {
   template: string;
   theme: unknown;
   open_to_work: boolean;
+  /** Story emails on (missing before the story_broadcast migration: treated as on). */
+  email_updates?: boolean;
   created_at: string;
 };
 

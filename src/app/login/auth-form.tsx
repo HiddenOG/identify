@@ -2,6 +2,7 @@
 
 import { useActionState } from "react";
 import Link from "next/link";
+import { GoogleSignIn } from "@/components/google-sign-in";
 import { signIn, signInWithProvider, signUp, type AuthState } from "./actions";
 
 const providerButton =
@@ -32,13 +33,18 @@ export function AuthForm({ mode, next, initialError }: { mode: "signin" | "signu
   return (
     <div className="space-y-6">
       <div className="space-y-3">
-        <form action={signInWithProvider}>
-          <input type="hidden" name="provider" value="google" />
-          <input type="hidden" name="next" value={next} />
-          <button className={providerButton}>
-            <GoogleLogo /> Continue with Google
-          </button>
-        </form>
+        <GoogleSignIn
+          next={next}
+          fallback={
+            <form action={signInWithProvider}>
+              <input type="hidden" name="provider" value="google" />
+              <input type="hidden" name="next" value={next} />
+              <button className={providerButton}>
+                <GoogleLogo /> Continue with Google
+              </button>
+            </form>
+          }
+        />
         <form action={signInWithProvider}>
           <input type="hidden" name="provider" value="github" />
           <input type="hidden" name="next" value={next} />

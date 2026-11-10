@@ -82,6 +82,15 @@ export async function setOpenToWork(open: boolean): Promise<AccountState> {
   return { ok: open ? "Recruiters can now find you under Open to work." : "You're no longer listed as open to work." };
 }
 
+/** "Story emails": the email everyone gets when Identify publishes a story (the bell notification always comes). */
+export async function setEmailUpdates(on: boolean): Promise<AccountState> {
+  const { supabase, userId } = await session();
+  if (!userId) return { error: "Your session expired. Sign in again." };
+  const { error } = await supabase.from("profiles").update({ email_updates: on }).eq("id", userId);
+  if (error) return { error: error.message };
+  return { ok: on ? "You'll get an email when Identify publishes a story." : "Story emails are off. You'll still see new stories in notifications." };
+}
+
 /** Ends every session on every device, including this one. */
 export async function signOutEverywhere() {
   const supabase = await createClient();
