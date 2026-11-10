@@ -9,7 +9,7 @@ import { SiteHeader } from "@/components/site-header";
 import { ThemeSync } from "@/components/theme";
 import { cvFontVariables } from "@/lib/fonts";
 import { SIDEBAR_SCRIPT } from "@/lib/sidebar";
-import { SITE_NAME, SITE_TAGLINE, SITE_URL } from "@/lib/site";
+import { SITE_NAME, SITE_URL } from "@/lib/site";
 import { THEME_SCRIPT } from "@/lib/theme";
 import "./globals.css";
 
@@ -32,7 +32,7 @@ const sourceSerif = Source_Serif_4({
 export const metadata: Metadata = {
   // Makes link-preview images and URLs absolute (WhatsApp, LinkedIn and X need full URLs).
   metadataBase: new URL(SITE_URL),
-  title: { default: `${SITE_NAME} — ${SITE_TAGLINE}`, template: `%s · ${SITE_NAME}` },
+  title: { default: SITE_NAME, template: `%s · ${SITE_NAME}` },
   description: "Your own CV website, and the projects behind it written up like stories.",
   openGraph: { siteName: SITE_NAME, type: "website" },
   twitter: { card: "summary_large_image" },
