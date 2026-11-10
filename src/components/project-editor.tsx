@@ -133,7 +133,9 @@ export function ProjectEditor({
   }
 
   return (
-    <form action={action} onInput={() => setDirty(true)} className="mx-auto max-w-3xl space-y-6 px-4 pt-20 pb-10">
+    // onChange, not onInput: a <select> fires "input" before "change", and re-rendering in between
+    // put a controlled dropdown back to its old value, so the first pick didn't stick.
+    <form action={action} onChange={() => setDirty(true)} className="mx-auto max-w-3xl space-y-6 px-4 pt-20 pb-10">
       {project && <input type="hidden" name="id" value={project.id} />}
       <input type="hidden" name="cover_url" value={cover} />
       <input type="hidden" name="body_md" value={body} />
