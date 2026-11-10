@@ -5,7 +5,7 @@ import { useActionState, useState, useTransition } from "react";
 import Link from "next/link";
 import { Markdown } from "@/components/markdown";
 import { importGithubRepo } from "@/lib/import/github-action";
-import { saveProject, type SaveProjectState } from "@/lib/project-actions";
+import { coverFromLink, saveProject, type SaveProjectState } from "@/lib/project-actions";
 import { FeaturePanel } from "@/components/feature-panel";
 import { FEATURE_OUTLINE, type AboutChoice } from "@/lib/features";
 import type { ProjectRow } from "@/lib/projects";
@@ -62,6 +62,21 @@ export function ProjectEditor({
   const [repoUrl, setRepoUrl] = useState("");
   const [importing, startImporting] = useTransition();
   const [importMessage, setImportMessage] = useState<{ kind: "ok" | "error"; text: string } | null>(null);
+  // Cover from a link: an image address or a website's preview picture.
+  const [coverLink, setCoverLink] = useState("");
+  const [fetchingCover, startFetchingCover] = useTransition();
+
+  function applyCoverLink() {
+    setUploadError("");
+    startFetchingCover(async () => {
+      const { url, error } = await coverFromLink(coverLink);
+      if (!url) return setUploadError(error ?? "Couldn't use that link.");
+      setCover(url);
+      setCoverLink("");
+      setDirty(true);
+    });
+  }
+
   // The cover URL that failed to load, if any.
   const [brokenCover, setBrokenCover] = useState<string | null>(null);
 
@@ -218,16 +233,41 @@ export function ProjectEditor({
             </button>
           </div>
         ) : (
-          <label className="grid aspect-[3/1] cursor-pointer place-items-center rounded-lg border-2 border-dashed border-line text-muted hover:border-foreground">
-            {uploading ? "Uploading…" : "Add a cover image (screenshot of your project)"}
-            <input
-              type="file"
-              accept="image/*"
-              className="sr-only"
-              disabled={uploading}
-              onChange={(e) => e.target.files?.[0] && uploadCover(e.target.files[0])}
-            />
-          </label>
+          <>
+            <label className="grid aspect-[3/1] cursor-pointer place-items-center rounded-lg border-2 border-dashed border-line text-muted hover:border-foreground">
+              {uploading ? "Uploading…" : "Add a cover image (screenshot of your project)"}
+              <input
+                type="file"
+                accept="image/*"
+                className="sr-only"
+                disabled={uploading}
+                onChange={(e) => e.target.files?.[0] && uploadCover(e.target.files[0])}
+              />
+            </label>
+            <div className="mt-3 flex gap-2">
+              <input
+                value={coverLink}
+                onChange={(e) => setCoverLink(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    if (coverLink.trim()) applyCoverLink();
+                  }
+                }}
+                placeholder="Or paste a website or image link to use its picture"
+                aria-label="Cover image from a link"
+                className={input}
+              />
+              <button
+                type="button"
+                onClick={applyCoverLink}
+                disabled={fetchingCover || !coverLink.trim()}
+                className="shrink-0 rounded-full bg-foreground px-4 py-2 text-sm font-medium text-background disabled:opacity-50"
+              >
+                {fetchingCover ? "Getting…" : "Use picture"}
+              </button>
+            </div>
+          </>
         )}
         {uploadError && <p className="mt-2 text-sm text-danger">{uploadError}</p>}
       </div>

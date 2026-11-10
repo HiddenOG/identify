@@ -3,6 +3,7 @@
 import { refresh, updateTag } from "next/cache";
 import { redirect } from "next/navigation";
 import { listForFeature } from "@/lib/discover/actions";
+import { fetchImage, readSitePreview, SiteError } from "@/lib/discover/site";
 import { isAdmin, PORTFOLIOS_TAG } from "@/lib/discover/portfolios";
 import { isFeatureSection } from "@/lib/features";
 import { getCurrentUser } from "@/lib/profiles";
@@ -186,4 +187,35 @@ export async function setStoryFeatured(formData: FormData) {
   if (error) console.error("[projects.setStoryFeatured]", error.message);
   updateTag(PROJECTS_TAG);
   refresh();
+}
+
+/**
+ * A cover from a link: an image address as it is, or a website's preview picture (the one it
+ * shows when shared). Copied into our storage so the story doesn't depend on their server.
+ */
+export async function coverFromLink(link: string): Promise<{ url?: string; error?: string }> {
+  const supabase = await createClient();
+  const { userId } = await getCurrentUser(supabase);
+  if (!userId) return { error: "Sign in first." };
+
+  let image = /^https?:\/\//i.test(link.trim()) ? await fetchImage(link.trim()) : null;
+  if (!image) {
+    try {
+      const { imageUrl } = await readSitePreview(link);
+      if (!imageUrl) return { error: "That site doesn't have a preview picture. Upload one instead." };
+      image = await fetchImage(imageUrl);
+    } catch (error) {
+      return { error: error instanceof SiteError ? error.message : "Couldn't read that link. Try again." };
+    }
+  }
+  if (!image) return { error: "Couldn't download that picture. Upload one instead." };
+
+  // Storage policies only allow writes under the user's own id folder.
+  const path = `${userId}/${crypto.randomUUID()}.${image.ext}`;
+  const { error } = await supabase.storage.from("project-images").upload(path, image.bytes, { contentType: image.type });
+  if (error) {
+    console.error("[projects.coverFromLink]", error.message);
+    return { error: "Couldn't save that picture. Try again." };
+  }
+  return { url: supabase.storage.from("project-images").getPublicUrl(path).data.publicUrl };
 }

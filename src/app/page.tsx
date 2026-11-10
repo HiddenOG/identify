@@ -104,7 +104,7 @@ export default async function Home() {
               <GetStarted />
             </Suspense>
             <DiscoverStrip />
-            {/* Visitors get Featured and Latest; members also get For you, first (needs their session). */}
+            {/* Featured first and selected for everyone; members also get For you (needs their session). */}
             <Suspense fallback={<FeedTabs tabs={[featuredTab, latestTab]} />}>
               <HomeFeed pool={pool} tabs={[featuredTab, latestTab]} empty={noProjects} />
             </Suspense>
@@ -165,7 +165,8 @@ async function HomeFeed({ pool, tabs, empty }: { pool: ProjectWithAuthor[]; tabs
       {stories.length === 0 ? empty : stories.map((project) => <ProjectCard key={project.id} project={project} />)}
     </>
   );
-  return <FeedTabs tabs={[{ id: "for-you", label: "For you", content: forYou }, ...tabs]} />;
+  const [featuredTab, ...rest] = tabs;
+  return <FeedTabs tabs={[featuredTab, { id: "for-you", label: "For you", content: forYou }, ...rest]} />;
 }
 
 async function Landing() {
