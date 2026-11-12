@@ -14,6 +14,8 @@ export type InviteDetails = {
   claimUrl: string;
   removeUrl: string;
   sender: string;
+  /** Where they are (the listing's location, e.g. "Lagos, Nigeria" or "Germany"); words the intro. */
+  location?: string | null;
   /** A published Discoveries feature about them; the email then leads with it. */
   feature?: { title: string; url: string };
 };
@@ -31,6 +33,20 @@ function firstName(name: string) {
   return name.trim().split(/\s+/)[0] || name;
 }
 
+const NIGERIAN = /\b(nigeria|nigerian|lagos|abuja|ibadan|port harcourt|enugu|kano)\b/i;
+
+/** What Identify is, worded for where they are: Nigeria is home; everyone else joins builders worldwide. */
+function whoWeAre(location?: string | null) {
+  return location && NIGERIAN.test(location)
+    ? "a place where people's work speaks for them, starting with talent here in Nigeria."
+    : "a place where people's work speaks for them, with builders from all over the world.";
+}
+
+/** "…and yours made the cut", naming where they're from when that's known and it isn't Nigeria. */
+function madeTheCut(location?: string | null) {
+  return location && !NIGERIAN.test(location) ? `and yours, from ${location}, made the cut.` : "and yours made the cut.";
+}
+
 const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
 const font = "-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif";
@@ -46,12 +62,12 @@ export function inviteHtml(d: InviteDetails) {
   const heading = f ? `${first}, we wrote about your work on ${SITE_NAME}` : `${first}, you&rsquo;ve been chosen to be featured on ${SITE_NAME}`;
   const intro = f
     ? [
-        p(`I'm ${esc(d.sender)}, and I'm building ${link(SITE_URL, SITE_NAME)}, a place where people's work speaks for them, starting with talent here in Nigeria. In Discoveries, we find great work on the internet and tell the story behind it.`),
+        p(`I'm ${esc(d.sender)}, and I'm building ${link(SITE_URL, SITE_NAME)}, ${whoWeAre(d.location)} In Discoveries, we find great work on the internet and tell the story behind it.`),
         p(`I came across ${link(`https://${d.host}`, d.host)} and <span style="background:#fef08a;">${esc(COMPLIMENT_PLACEHOLDER)}</span> So we wrote about it: ${link(f.url, f.title)}. It credits you and links straight to your site.`),
         p(`You&rsquo;re also listed under ${link(d.categoryUrl, d.categoryLabel)}, and that listing is yours to claim, for free. Claiming it turns it into your own ${SITE_NAME} profile: a CV website at <strong>${esc(new URL(SITE_URL).host)}/yourname</strong>, the feature linked to it, and a place to write up your own projects.`),
       ].join("\n    ")
     : [
-        p(`I'm ${esc(d.sender)}, and I'm building ${link(SITE_URL, SITE_NAME)}, a place where people's work speaks for them, starting with talent here in Nigeria. We hand-pick every portfolio on our Discover page, and yours made the cut.`),
+        p(`I'm ${esc(d.sender)}, and I'm building ${link(SITE_URL, SITE_NAME)}, ${whoWeAre(d.location)} We hand-pick every portfolio on our Discover page, ${esc(madeTheCut(d.location))}`),
         p(`I came across ${link(`https://${d.host}`, d.host)} and <span style="background:#fef08a;">${esc(COMPLIMENT_PLACEHOLDER)}</span> You&rsquo;re now featured under ${link(d.categoryUrl, d.categoryLabel)}.`),
         p(`The listing only shows your name, your role and a link to your site. It&rsquo;s yours to claim, for free. Claiming it turns it into your own ${SITE_NAME} profile: a CV website at <strong>${esc(new URL(SITE_URL).host)}/yourname</strong>, a place to write up your projects, and a way for recruiters to find you by skill.`),
       ].join("\n    ");
@@ -84,7 +100,7 @@ export function inviteText(d: InviteDetails) {
     return [
       `${firstName(d.name)}, we wrote about your work on ${SITE_NAME}.`,
       "",
-      `I'm ${d.sender}, and I'm building ${SITE_NAME} (${SITE_URL}), a place where people's work speaks for them, starting with talent here in Nigeria. In Discoveries, we find great work on the internet and tell the story behind it.`,
+      `I'm ${d.sender}, and I'm building ${SITE_NAME} (${SITE_URL}), ${whoWeAre(d.location)} In Discoveries, we find great work on the internet and tell the story behind it.`,
       "",
       `I came across ${d.host} and ${COMPLIMENT_PLACEHOLDER} So we wrote about it: ${f.title}, ${f.url}. It credits you and links straight to your site.`,
       "",
@@ -101,7 +117,7 @@ export function inviteText(d: InviteDetails) {
   return [
     `${firstName(d.name)}, you've been chosen to be featured on ${SITE_NAME}.`,
     "",
-    `I'm ${d.sender}, and I'm building ${SITE_NAME} (${SITE_URL}), a place where people's work speaks for them, starting with talent here in Nigeria. We hand-pick every portfolio on our Discover page, and yours made the cut.`,
+    `I'm ${d.sender}, and I'm building ${SITE_NAME} (${SITE_URL}), ${whoWeAre(d.location)} We hand-pick every portfolio on our Discover page, ${madeTheCut(d.location)}`,
     "",
     `I came across ${d.host} and ${COMPLIMENT_PLACEHOLDER} You're now featured under ${d.categoryLabel}: ${d.categoryUrl}`,
     "",

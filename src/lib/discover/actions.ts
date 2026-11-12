@@ -7,7 +7,7 @@ import { getCurrentUser } from "@/lib/profiles";
 import { createClient } from "@/lib/supabase/server";
 import { isPortfolioCategory } from "./categories";
 import { getPortfolio, isAdmin, PORTFOLIOS_TAG } from "./portfolios";
-import { fetchImage, normalizeUrl, readSitePreview, SiteError, type SitePreview } from "./site";
+import { displayHost, fetchImage, normalizeUrl, readSitePreview, SiteError, type SitePreview } from "./site";
 import { supabaseUrl } from "@/lib/supabase/env";
 
 /** What every form on Discover gets back: a message to show, or an error. */
@@ -158,6 +158,82 @@ export async function listForFeature(input: {
   if (email) await supabase.from("portfolio_contacts").upsert({ portfolio_id: data.id, email }, { onConflict: "portfolio_id" });
   updateTag(PORTFOLIOS_TAG);
   return { id: data.id };
+}
+
+const BULK_MAX = 500;
+
+/**
+ * Admins: adds many portfolios at once from a pasted list, one per line, fields split by "|":
+ *   url | name | role | location | category | email | description | image
+ * Only the url is required. Everything lands in "Suggestions to review" (pending), so nothing is
+ * public until it's approved one by one; approving also takes our own copy of the image.
+ * Sites already on Discover are skipped.
+ */
+export async function bulkAddPortfolios(_: ActionState, formData: FormData): Promise<ActionState> {
+  const supabase = await adminClient();
+  if (!supabase) return { error: "Admins only." };
+  const lines = text(formData, "list").split(/\r?\n/).map((l) => l.trim()).filter((l) => l && !l.startsWith("#"));
+  if (!lines.length) return { error: "Paste at least one line." };
+  if (lines.length > BULK_MAX) return { error: `Up to ${BULK_MAX} lines at a time.` };
+
+  const rows: Record<string, unknown>[] = [];
+  const emails = new Map<string, string>();
+  const problems: string[] = [];
+  for (const [i, line] of lines.entries()) {
+    const [rawUrl = "", name = "", role = "", location = "", category = "", email = "", description = "", image = ""] = line.split("|").map((f) => f.trim());
+    let url: string;
+    try {
+      url = normalizeUrl(rawUrl);
+    } catch {
+      problems.push(`line ${i + 1}`);
+      continue;
+    }
+    const parsed = portfolioSchema.safeParse({
+      name: name || displayHost(url),
+      role,
+      location,
+      description: description.slice(0, 400),
+      image_url: /^https?:\/\//i.test(image) ? image : "",
+      category: isPortfolioCategory(category) ? category : "developer",
+      email: /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email) ? email : "",
+    });
+    if (!parsed.success) {
+      problems.push(`line ${i + 1}`);
+      continue;
+    }
+    const { email: contact, ...fields } = parsed.data;
+    rows.push({ ...fields, url, status: "pending", source: "admin" });
+    if (contact) emails.set(url, contact);
+  }
+
+  // Skip what's already on Discover (any status), including duplicates within the list.
+  const { data: existing } = await supabase.from("portfolios").select("url").in("url", rows.map((r) => r.url as string)).returns<{ url: string }[]>();
+  const taken = new Set((existing ?? []).map((r) => r.url));
+  const fresh = rows.filter((r) => {
+    const url = r.url as string;
+    if (taken.has(url)) return false;
+    taken.add(url);
+    return true;
+  });
+
+  let added = 0;
+  for (let i = 0; i < fresh.length; i += 100) {
+    const { data, error } = await supabase.from("portfolios").insert(fresh.slice(i, i + 100)).select("id, url").returns<{ id: string; url: string }[]>();
+    if (error) return { error: `Stopped after ${added}: ${error.message}` };
+    added += data.length;
+    const contacts = data.filter((r) => emails.has(r.url)).map((r) => ({ portfolio_id: r.id, email: emails.get(r.url)! }));
+    if (contacts.length) await supabase.from("portfolio_contacts").upsert(contacts, { onConflict: "portfolio_id" });
+  }
+
+  changed();
+  const skipped = rows.length - fresh.length;
+  return {
+    message: [
+      `${added} added to Suggestions to review.`,
+      skipped ? `${skipped} already on Discover.` : "",
+      problems.length ? `Couldn't read ${problems.length} (${problems.slice(0, 5).join(", ")}${problems.length > 5 ? "…" : ""}).` : "",
+    ].filter(Boolean).join(" "),
+  };
 }
 
 export async function setPortfolioStatus(_: ActionState, formData: FormData): Promise<ActionState> {

@@ -5,7 +5,7 @@ import { notFound } from "next/navigation";
 import { ActionForm } from "@/components/action-form";
 import { CopyInviteButton } from "@/components/discover/copy-invite-button";
 import { SiteImage } from "@/components/discover/site-image";
-import { approveClaim, markInvited, rejectClaim, setPortfolioStatus, storeAllImages, toggleFeatured } from "@/lib/discover/actions";
+import { approveClaim, bulkAddPortfolios, markInvited, rejectClaim, setPortfolioStatus, storeAllImages, toggleFeatured } from "@/lib/discover/actions";
 import { categoryInfo } from "@/lib/discover/categories";
 import { ago, getDiscoverActivity, type ActivityEvent, type ActivityKind, type ListingActivity } from "@/lib/discover/activity";
 import { isAdmin, type Portfolio } from "@/lib/discover/portfolios";
@@ -109,6 +109,24 @@ async function Admin() {
           an email they publish for contact.
         </p>
         <PortfolioForm />
+        <details className="mt-6 rounded-xl border border-line p-4">
+          <summary className="cursor-pointer text-sm font-medium">Bulk add (paste a list)</summary>
+          <p className="mt-3 text-sm text-muted">
+            One portfolio per line, fields split by <code>|</code>: <code>url | name | role | location | category | email | description | image</code>.
+            Only the url is needed; category is developer, design, data or other. Lines starting with # are skipped. Everything goes to
+            Suggestions to review below, so nothing is public until you approve it.
+          </p>
+          <ActionForm action={bulkAddPortfolios} className="mt-3 space-y-3">
+            <textarea
+              name="list"
+              rows={8}
+              required
+              placeholder="https://example.dev | Ada Obi | Frontend engineer | Lagos, Nigeria | developer | ada@example.dev"
+              className="w-full rounded-lg border border-line bg-background px-3 py-2 font-mono text-xs outline-none focus:border-foreground"
+            />
+            <button className="rounded-full bg-foreground px-4 py-1.5 text-sm text-background hover:opacity-90 disabled:opacity-60">Add to review</button>
+          </ActionForm>
+        </details>
       </section>
 
       {claims.data && claims.data.length > 0 && (
@@ -204,6 +222,7 @@ function inviteFor(p: Portfolio, signature: string, feature?: ListingFeature) {
     claimUrl: `${SITE_URL}/discover/claim/${p.id}`,
     removeUrl: `${SITE_URL}/discover/remove/${p.id}`,
     sender: signature.split(/\s+/)[0],
+    location: p.location,
     feature: feature?.published ? { title: feature.title, url: `${SITE_URL}${feature.href}` } : undefined,
   };
   return { subject: inviteSubject(p.name, Boolean(details.feature)), html: inviteHtml(details), text: inviteText(details) };
