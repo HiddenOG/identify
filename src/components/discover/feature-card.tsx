@@ -2,7 +2,7 @@ import Link from "next/link";
 import { AuthorAvatar } from "@/components/author-avatar";
 import { RemoteImage } from "@/components/remote-image";
 import { SiteImage } from "@/components/discover/site-image";
-import { displayHost } from "@/lib/discover/site";
+import { displayHost } from "@/lib/discover/host";
 import { sectionInfo, type Feature } from "@/lib/features";
 import { formatDate, projectHref, readingMinutes } from "@/lib/projects";
 

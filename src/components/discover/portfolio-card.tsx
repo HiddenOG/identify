@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { SiteImage } from "@/components/discover/site-image";
 import type { Portfolio } from "@/lib/discover/portfolios";
-import { displayHost } from "@/lib/discover/site";
+import { displayHost } from "@/lib/discover/host";
 
 const pill = "rounded-full border px-2 py-0.5 text-[10px] font-semibold tracking-wide uppercase";
 

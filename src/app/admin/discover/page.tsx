@@ -10,8 +10,7 @@ import { categoryInfo } from "@/lib/discover/categories";
 import { ago, getDiscoverActivity, type ActivityEvent, type ActivityKind, type ListingActivity } from "@/lib/discover/activity";
 import { isAdmin, type Portfolio } from "@/lib/discover/portfolios";
 import { displayHost } from "@/lib/discover/site";
-import { getCurrentUser } from "@/lib/profiles";
-import { CONTACT_EMAIL, SITE_NAME, SITE_URL } from "@/lib/site";
+import { CONTACT_EMAIL, SITE_URL } from "@/lib/site";
 import { inviteHtml, inviteSubject, inviteText } from "@/lib/discover/invite";
 import { hasSupabaseEnv, supabaseUrl } from "@/lib/supabase/env";
 import { createClient } from "@/lib/supabase/server";
@@ -47,8 +46,7 @@ async function Admin() {
   const supabase = await createClient();
   if (!(await isAdmin(supabase))) notFound();
 
-  const [{ profile }, { events, byListing }, portfolios, contacts, claims, removals, features] = await Promise.all([
-    getCurrentUser(supabase),
+  const [{ events, byListing }, portfolios, contacts, claims, removals, features] = await Promise.all([
     getDiscoverActivity(supabase),
     supabase.from("portfolios").select("*").order("created_at", { ascending: false }).limit(500).returns<Portfolio[]>(),
     supabase.from("portfolio_contacts").select("*").returns<Contact[]>(),
@@ -80,7 +78,6 @@ async function Admin() {
   }
   const pending = all.filter((p) => p.status === "pending");
   const live = all.filter((p) => p.status === "listed" || p.status === "claimed");
-  const signature = profile?.full_name || SITE_NAME;
   const storagePrefix = `${supabaseUrl}/storage/v1/object/public/`;
   const slowImages = all.filter((p) => p.status !== "removed" && p.image_url && !p.image_url.startsWith(storagePrefix)).length;
 
@@ -175,7 +172,7 @@ async function Admin() {
               </button>
             </ActionForm>
           </div>
-          <PortfolioList portfolios={pending} contactOf={contactOf} featureOf={featureOf} signature={signature} activity={byListing} />
+          <PortfolioList portfolios={pending} contactOf={contactOf} featureOf={featureOf} activity={byListing} />
         </section>
       )}
 
@@ -184,7 +181,7 @@ async function Admin() {
         {live.length === 0 ? (
           <p className="text-muted">Nothing listed yet.</p>
         ) : (
-          <PortfolioList portfolios={live} contactOf={contactOf} featureOf={featureOf} signature={signature} activity={byListing} />
+          <PortfolioList portfolios={live} contactOf={contactOf} featureOf={featureOf} activity={byListing} />
         )}
       </section>
 
@@ -221,7 +218,7 @@ async function Admin() {
 }
 
 /** The designed invite for one listing. Links always use the live site, even when testing locally. */
-function inviteFor(p: Portfolio, signature: string, feature?: ListingFeature) {
+function inviteFor(p: Portfolio, feature?: ListingFeature) {
   const details = {
     name: p.name,
     host: displayHost(p.url),
@@ -229,7 +226,6 @@ function inviteFor(p: Portfolio, signature: string, feature?: ListingFeature) {
     categoryUrl: `${SITE_URL}/discover/${p.category}`,
     claimUrl: `${SITE_URL}/discover/claim/${p.id}`,
     removeUrl: `${SITE_URL}/discover/remove/${p.id}`,
-    sender: signature.split(/\s+/)[0],
     location: p.location,
     feature: feature?.published ? { title: feature.title, url: `${SITE_URL}${feature.href}` } : undefined,
   };
@@ -240,13 +236,11 @@ function PortfolioList({
   portfolios,
   contactOf,
   featureOf,
-  signature,
   activity,
 }: {
   portfolios: Portfolio[];
   contactOf: Map<string, Contact>;
   featureOf: Map<string, ListingFeature>;
-  signature: string;
   activity: Map<string, ListingActivity>;
 }) {
   return (
@@ -333,7 +327,7 @@ function PortfolioList({
               )}
               {canInvite && (
                 <>
-                  <CopyInviteButton {...inviteFor(p, signature, feature)} to={contact.email!} fromAccount={CONTACT_EMAIL} className={small} />
+                  <CopyInviteButton {...inviteFor(p, feature)} to={contact.email!} fromAccount={CONTACT_EMAIL} className={small} />
                   <ActionForm action={markInvited} fields={{ id: p.id }}>
                     <button className={small}>Mark invited</button>
                   </ActionForm>

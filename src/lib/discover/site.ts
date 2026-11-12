@@ -34,13 +34,9 @@ export function normalizeUrl(input: string) {
   return url.toString().replace(/\/$/, "");
 }
 
-export function displayHost(url: string) {
-  try {
-    return new URL(url).hostname.replace(/^www\./, "");
-  } catch {
-    return url;
-  }
-}
+import { displayHost } from "./host";
+
+export { displayHost };
 
 function isPrivateAddress(address: string) {
   const v4 = address.startsWith("::ffff:") ? address.slice(7) : address;

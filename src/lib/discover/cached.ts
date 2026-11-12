@@ -10,7 +10,7 @@ export async function getCachedPortfolios(category?: PortfolioCategory) {
   "use cache";
   cacheLife("minutes");
   cacheTag(PORTFOLIOS_TAG);
-  return getPublicPortfolios(createPublicClient(), category, category ? 60 : 200);
+  return getPublicPortfolios(createPublicClient(), category, category ? 60 : 1000);
 }
 
 /** Cached published features (Discoveries); a new feature or a claim clears it. */

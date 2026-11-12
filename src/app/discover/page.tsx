@@ -1,13 +1,10 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { FeatureCard, FeatureHero } from "@/components/discover/feature-card";
-import { PortfolioBento, PortfolioCard } from "@/components/discover/portfolio-card";
-import { ShowMore } from "@/components/show-more";
-import { SiteImage } from "@/components/discover/site-image";
+import { PortfolioBento } from "@/components/discover/portfolio-card";
+import { PortfolioDirectory } from "@/components/discover/portfolio-directory";
 import { SetupNotice } from "@/components/setup-notice";
 import { getCachedFeatures, getCachedPortfolios } from "@/lib/discover/cached";
-import { PORTFOLIO_CATEGORIES } from "@/lib/discover/categories";
-import { displayHost } from "@/lib/discover/site";
 import { hasSupabaseEnv } from "@/lib/supabase/env";
 
 export const metadata: Metadata = {
@@ -28,12 +25,6 @@ export default async function DiscoverPage() {
   const [portfolios, features] = await Promise.all([getCachedPortfolios(), getCachedFeatures(undefined, 4)]);
   const [lead, ...moreFeatures] = features;
   const featured = portfolios.slice(0, 3);
-  const featuredIds = new Set(featured.map((p) => p.id));
-  const shelves = PORTFOLIO_CATEGORIES.map((c) => {
-    const items = portfolios.filter((p) => p.category === c.id);
-    // Cover each tile with one that isn't already in Featured, when there is one.
-    return { ...c, items, cover: items.find((p) => !featuredIds.has(p.id)) ?? items[0] };
-  }).filter((c) => c.items.length > 0);
   // Newest first, so every listing can be found by scrolling.
   const latest = portfolios.toSorted((a, b) => (b.listed_at ?? b.created_at).localeCompare(a.listed_at ?? a.created_at));
 
@@ -84,34 +75,8 @@ export default async function DiscoverPage() {
           </section>
 
           <section>
-            <h2 className="mb-4 text-xl font-bold">Browse by discipline</h2>
-            <div className="grid gap-x-6 gap-y-10 sm:grid-cols-2">
-              {shelves.map((c) => (
-                <Link key={c.id} href={`/discover/${c.id}`} className="group block">
-                  <div className="overflow-hidden rounded-2xl border border-line">
-                    <SiteImage
-                      src={c.cover.image_url}
-                      host={displayHost(c.cover.url)}
-                      className="aspect-[16/10] w-full transition-transform duration-500 group-hover:scale-[1.02]"
-                    />
-                  </div>
-                  <h3 className="mt-3 text-lg font-bold group-hover:underline">{c.label}</h3>
-                  <p className="text-muted">
-                    {c.blurb} <span className="text-sm">· {c.items.length}</span>
-                  </p>
-                </Link>
-              ))}
-            </div>
-          </section>
-
-          <section className="mt-14">
-            <h2 className="mb-4 text-xl font-bold">All portfolios ({portfolios.length})</h2>
-            <ShowMore
-              className="grid gap-x-6 gap-y-10 sm:grid-cols-2 lg:grid-cols-3"
-              items={latest.map((p) => (
-                <PortfolioCard key={p.id} portfolio={p} />
-              ))}
-            />
+            <h2 className="mb-4 text-xl font-bold">All portfolios</h2>
+            <PortfolioDirectory portfolios={latest} />
           </section>
         </>
       )}
