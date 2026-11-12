@@ -50,3 +50,18 @@ export async function isAdmin(supabase: SupabaseClient) {
   const { data } = await supabase.rpc("is_admin");
   return data === true;
 }
+
+/** Discover listings matching a search (name, role, place, site or blurb), for the site-wide search. */
+export async function searchPortfolios(supabase: SupabaseClient, term: string, limit = 12) {
+  if (!term) return [];
+  const { data, error } = await supabase
+    .from("portfolios")
+    .select(SELECT)
+    .eq("status", "listed") // claimed ones show up under People as members
+    .or(`name.ilike.%${term}%,role.ilike.%${term}%,location.ilike.%${term}%,url.ilike.%${term}%,description.ilike.%${term}%`)
+    .order("featured", { ascending: false })
+    .limit(limit)
+    .returns<Portfolio[]>();
+  if (error) console.error("[discover.searchPortfolios]", error.message);
+  return data ?? [];
+}

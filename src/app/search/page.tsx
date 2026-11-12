@@ -9,6 +9,8 @@ import { SearchIcon } from "@/components/icons";
 import { PersonLink } from "@/components/person-link";
 import { ProjectCard } from "@/components/project-card";
 import { RemoteImage } from "@/components/remote-image";
+import { searchPortfolios } from "@/lib/discover/portfolios";
+import { displayHost } from "@/lib/discover/host";
 import { searchProfiles } from "@/lib/profiles";
 import { cleanSearchTerm, formatDate, getTrending, projectHref, PROJECTS_TAG, searchProjects } from "@/lib/projects";
 import { hasSupabaseEnv } from "@/lib/supabase/env";
@@ -42,9 +44,9 @@ async function SearchResults({ searchParams }: Pick<PageProps<"/search">, "searc
   const term = cleanSearchTerm(q);
 
   const supabase = hasSupabaseEnv && term ? createPublicClient() : null;
-  const [projects, people] = supabase
-    ? await Promise.all([searchProjects(supabase, term), searchProfiles(supabase, term)])
-    : [[], []];
+  const [projects, people, portfolios] = supabase
+    ? await Promise.all([searchProjects(supabase, term), searchProfiles(supabase, term), searchPortfolios(supabase, term)])
+    : [[], [], []];
   const trending = !term && hasSupabaseEnv ? await getCachedTrending() : [];
 
   return (
@@ -55,7 +57,7 @@ async function SearchResults({ searchParams }: Pick<PageProps<"/search">, "searc
           name="q"
           defaultValue={q}
           aria-label="Search"
-          placeholder="Search projects, topics and people"
+          placeholder="Search projects, people and portfolios"
           className="w-full rounded-full bg-surface py-3 pr-5 pl-12 outline-none placeholder:text-muted focus:bg-surface-hover"
         />
       </Form>
@@ -123,6 +125,28 @@ async function SearchResults({ searchParams }: Pick<PageProps<"/search">, "searc
                 {people.map((p) => (
                   <li key={p.id}>
                     <PersonLink person={p.view} />
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+          {portfolios.length > 0 && (
+            <section className="mb-10">
+              <h2 className="mb-4 text-sm font-semibold">
+                Portfolios on{" "}
+                <Link href="/discover" className="underline">
+                  Discover
+                </Link>
+              </h2>
+              <ul className="divide-y divide-line">
+                {portfolios.map((p) => (
+                  <li key={p.id} className="flex items-baseline gap-3 py-3">
+                    <a href={p.url} target="_blank" rel="noopener noreferrer" className="flex min-w-0 flex-1 items-baseline gap-3 hover:[&>span:first-child]:underline">
+                      <span className="shrink-0 font-medium">{p.name}</span>
+                      <span className="truncate text-sm text-muted">{p.role || displayHost(p.url)}</span>
+                    </a>
+                    {p.location && <span className="hidden max-w-40 shrink-0 truncate text-xs text-muted sm:inline">{p.location}</span>}
+                    <span className="shrink-0 text-xs text-muted">{displayHost(p.url)} ↗</span>
                   </li>
                 ))}
               </ul>
