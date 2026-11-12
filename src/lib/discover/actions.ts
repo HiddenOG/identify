@@ -236,6 +236,23 @@ export async function bulkAddPortfolios(_: ActionState, formData: FormData): Pro
   };
 }
 
+/**
+ * Admins: approves everything waiting in Suggestions to review at once (after rejecting the ones
+ * you don't want). Images aren't copied here, which would be slow for hundreds; use Speed up images.
+ */
+export async function approveAllPending(): Promise<ActionState> {
+  const supabase = await adminClient();
+  if (!supabase) return { error: "Admins only." };
+  const { data, error } = await supabase
+    .from("portfolios")
+    .update({ status: "listed", listed_at: new Date().toISOString() })
+    .eq("status", "pending")
+    .select("id");
+  if (error) return { error: error.message };
+  changed();
+  return { message: `${data.length} approved and now on Discover. Press Speed up images (top of this page) to make their cards load fast.` };
+}
+
 export async function setPortfolioStatus(_: ActionState, formData: FormData): Promise<ActionState> {
   const supabase = await adminClient();
   if (!supabase) return { error: "Admins only." };
@@ -265,20 +282,28 @@ export async function storeAllImages(): Promise<ActionState> {
     .in("status", ["listed", "claimed", "pending"])
     .not("image_url", "is", null)
     .returns<{ id: string; image_url: string }[]>();
-  const todo = (data ?? []).filter((p) => !isStored(p.image_url));
+  // A batch per press (6 at a time), so hundreds of new listings never run past the server's time limit.
+  const all = (data ?? []).filter((p) => !isStored(p.image_url));
+  const todo = all.slice(0, 60);
   let done = 0;
-  for (const p of todo) {
-    const stored = await storeImage(supabase, p.image_url);
-    if (stored && stored !== p.image_url) {
-      const { error } = await supabase.from("portfolios").update({ image_url: stored }).eq("id", p.id);
-      if (!error) done++;
-    }
+  for (let i = 0; i < todo.length; i += 6) {
+    await Promise.all(
+      todo.slice(i, i + 6).map(async (p) => {
+        const stored = await storeImage(supabase, p.image_url);
+        if (stored && stored !== p.image_url) {
+          const { error } = await supabase.from("portfolios").update({ image_url: stored }).eq("id", p.id);
+          if (!error) done++;
+        }
+      }),
+    );
   }
   changed();
   const failed = todo.length - done;
+  const left = all.length - todo.length;
+  const more = left ? ` ${left} more to go: press it again.` : "";
   return failed
-    ? { error: `Sped up ${done} of ${todo.length}. ${failed} couldn't be copied (their site blocked it); they still load from the original.` }
-    : { message: `Sped up ${done} image${done === 1 ? "" : "s"}.` };
+    ? { error: `Sped up ${done} of ${todo.length}. ${failed} couldn't be copied (their site blocked it); they still load from the original.${more}` }
+    : { message: `Sped up ${done} image${done === 1 ? "" : "s"}.${more}` };
 }
 
 export async function toggleFeatured(_: ActionState, formData: FormData): Promise<ActionState> {

@@ -5,7 +5,7 @@ import { notFound } from "next/navigation";
 import { ActionForm } from "@/components/action-form";
 import { CopyInviteButton } from "@/components/discover/copy-invite-button";
 import { SiteImage } from "@/components/discover/site-image";
-import { approveClaim, bulkAddPortfolios, markInvited, rejectClaim, setPortfolioStatus, storeAllImages, toggleFeatured } from "@/lib/discover/actions";
+import { approveAllPending, approveClaim, bulkAddPortfolios, markInvited, rejectClaim, setPortfolioStatus, storeAllImages, toggleFeatured } from "@/lib/discover/actions";
 import { categoryInfo } from "@/lib/discover/categories";
 import { ago, getDiscoverActivity, type ActivityEvent, type ActivityKind, type ListingActivity } from "@/lib/discover/activity";
 import { isAdmin, type Portfolio } from "@/lib/discover/portfolios";
@@ -166,7 +166,15 @@ async function Admin() {
 
       {pending.length > 0 && (
         <section>
-          <h2 className="mb-4 text-xl font-bold">Suggestions to review ({pending.length})</h2>
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+            <h2 className="text-xl font-bold">Suggestions to review ({pending.length})</h2>
+            {/* Reject the ones you don't want first; this approves everything still here. */}
+            <ActionForm action={approveAllPending}>
+              <button className="rounded-full bg-foreground px-4 py-1.5 text-sm text-background hover:opacity-90 disabled:opacity-60">
+                Approve all {pending.length}
+              </button>
+            </ActionForm>
+          </div>
           <PortfolioList portfolios={pending} contactOf={contactOf} featureOf={featureOf} signature={signature} activity={byListing} />
         </section>
       )}
