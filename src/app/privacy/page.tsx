@@ -9,7 +9,7 @@ export default function PrivacyPage() {
   return (
     <DocPage
       title="Privacy Policy"
-      updated="October 29, 2026"
+      updated="November 13, 2026"
       intro={`What ${SITE_NAME} collects, what's public, what's private, and how to remove it.`}
     >
       <h2>What we collect</h2>
@@ -63,19 +63,52 @@ export default function PrivacyPage() {
         uploading.
       </p>
 
-      <h2>Discover listings</h2>
+      <h2 id="discover">Discover: if we listed or wrote about you</h2>
       <p>
-        Discover features personal portfolio websites we think deserve to be seen, including some whose owners aren&apos;t on{" "}
-        {SITE_NAME} yet. These listings are picked by people, not collected by a crawler. A listing shows only the person&apos;s
-        name, role, location, a link to their site and the preview image their site publishes for sharing; we don&apos;t copy
-        their work. We only read sites whose robots.txt allows it, and we only keep an email address the person publishes for
-        contact, never shown publicly.
+        Discover features people and projects we think deserve to be seen, including some who aren&apos;t on {SITE_NAME} yet.
+        Each one is picked by a person on our team, not collected by a crawler.
       </p>
+      <ul>
+        <li>
+          <strong>How we found you:</strong> on your own public website, or where you shared it publicly, such as a post on X, a
+          GitHub profile or a public portfolio directory.
+        </li>
+        <li>
+          <strong>What a listing shows:</strong> your name, role, location, a short description in our own words, a link to your
+          site, and a copy of the preview image your site publishes for sharing. We don&apos;t copy your work or your text.
+        </li>
+        <li>
+          <strong>What we keep privately:</strong> a contact email, but only one you publish yourself (on your site or profile).
+          It&apos;s never shown on {SITE_NAME}, sold or shared.
+        </li>
+        <li>
+          <strong>Stories (Discover projects):</strong> we sometimes write about a project, with a link back to its creator.
+          This is our own commentary; screenshots and images stay credited and linked to their source.
+        </li>
+        <li>
+          <strong>Emails:</strong> we may send you one email to say you&apos;ve been listed or written about, with a link to
+          claim your page. We don&apos;t add you to a mailing list.
+        </li>
+      </ul>
       <p>
-        Every listing its owner hasn&apos;t claimed has an &ldquo;Is this you?&rdquo; link. It leads to a page where the owner can
-        claim the listing for free, or remove it without an account: it comes down at once, and we won&apos;t contact that
-        person again.
+        We do this because we have a legitimate interest in showcasing public work, and it&apos;s limited to what you&apos;ve
+        already made public. You stay in control:
       </p>
+      <ul>
+        <li>
+          <strong>Claim it:</strong> it becomes your free {SITE_NAME} page, and you can edit or delete it like any profile.
+        </li>
+        <li>
+          <strong>Remove it:</strong> every unclaimed listing, and every invite email, has a &ldquo;Remove your listing&rdquo;
+          link. No account needed. It comes down at once, any story about you comes down with it, and we won&apos;t email you
+          again.
+        </li>
+        <li>
+          <strong>Ask us anything:</strong> to see what we hold about you, correct it, or take down a single image or sentence,
+          contact us using the details at the bottom of this page.
+        </li>
+      </ul>
+      <p>We only read sites whose robots.txt allows it.</p>
 
       <h2>Cookies and local storage</h2>
       <ul>
@@ -105,6 +138,10 @@ export default function PrivacyPage() {
           described above.
         </li>
         <li>
+          <strong>Resend</strong> and <strong>Gmail</strong> deliver our emails (story emails to members, and Discover
+          invites).
+        </li>
+        <li>
           <strong>Google</strong>, if you sign in with it.
         </li>
         <li>
@@ -116,6 +153,9 @@ export default function PrivacyPage() {
       <ul>
         <li>Edit or remove anything you&apos;ve posted at any time.</li>
         <li>Change your email, username or password in Settings.</li>
+        <li>
+          Turn off story emails in <Link href="/settings#emails">Settings → Story emails</Link>, or with the link in any of them.
+        </li>
         <li>
           Delete your account in <Link href="/settings">Settings → Account</Link>. This permanently removes your profile, CV,
           projects, comments, likes, follows, messages and uploaded images.
