@@ -407,6 +407,29 @@ export async function suggestPortfolio(_: ActionState, formData: FormData): Prom
 }
 
 /** Instant claim when the member signed in with the email we contacted them on. */
+/**
+ * Claims a listing for the signed-in member without them pressing anything: with the private code
+ * from their invite link when there is one (any account will do), otherwise when their sign-in
+ * email is the one we contacted. `claimed: false` means neither applied; the page then offers
+ * "Request to claim".
+ */
+export async function autoClaim(portfolioId: string, token?: string | null): Promise<{ claimed: boolean; error?: string }> {
+  if (!/^[0-9a-f-]{36}$/i.test(portfolioId)) return { claimed: false };
+  const supabase = await createClient();
+  const { userId } = await getCurrentUser(supabase);
+  if (!userId) return { claimed: false, error: "Sign in first." };
+
+  const { data, error } = token
+    ? await supabase.rpc("claim_portfolio_by_token", { target: portfolioId, token: token.slice(0, 64) })
+    : await supabase.rpc("claim_portfolio_by_email", { target: portfolioId });
+  if (error) {
+    console.error("[discover.autoClaim]", error.message);
+    return { claimed: false };
+  }
+  if (data) changed();
+  return { claimed: Boolean(data) };
+}
+
 export async function claimByEmail(_: ActionState, formData: FormData): Promise<ActionState> {
   const supabase = await createClient();
   const { userId } = await getCurrentUser(supabase);

@@ -32,7 +32,7 @@ export default function DiscoverAdminPage() {
   );
 }
 
-type Contact = { portfolio_id: string; email: string | null; invited_at: string | null; do_not_contact: boolean };
+type Contact = { portfolio_id: string; email: string | null; invited_at: string | null; do_not_contact: boolean; claim_token?: string | null };
 type Claim = { portfolio_id: string; user_id: string; created_at: string; note?: string | null; profile: { username: string | null } | null };
 type FeatureRow = { about_portfolio: string; slug: string; title: string; status: string; author: { username: string } | null };
 /** A listing's newest Discoveries feature (published wins over drafts). */
@@ -218,13 +218,14 @@ async function Admin() {
 }
 
 /** The designed invite for one listing. Links always use the live site, even when testing locally. */
-function inviteFor(p: Portfolio, feature?: ListingFeature) {
+function inviteFor(p: Portfolio, feature?: ListingFeature, token?: string | null) {
   const details = {
     name: p.name,
     host: displayHost(p.url),
     categoryLabel: categoryInfo(p.category).label,
     categoryUrl: `${SITE_URL}/discover/${p.category}`,
-    claimUrl: `${SITE_URL}/discover/claim/${p.id}`,
+    // The private code lets whoever opens it from the email claim with any account.
+    claimUrl: `${SITE_URL}/discover/claim/${p.id}${token ? `?t=${token}` : ""}`,
     removeUrl: `${SITE_URL}/discover/remove/${p.id}`,
     location: p.location,
     feature: feature?.published ? { title: feature.title, url: `${SITE_URL}${feature.href}` } : undefined,
@@ -327,7 +328,7 @@ function PortfolioList({
               )}
               {canInvite && (
                 <>
-                  <CopyInviteButton {...inviteFor(p, feature)} to={contact.email!} fromAccount={CONTACT_EMAIL} className={small} />
+                  <CopyInviteButton {...inviteFor(p, feature, contact.claim_token)} to={contact.email!} fromAccount={CONTACT_EMAIL} className={small} />
                   <ActionForm action={markInvited} fields={{ id: p.id }}>
                     <button className={small}>Mark invited</button>
                   </ActionForm>

@@ -6,3 +6,14 @@ export function displayHost(url: string) {
     return url;
   }
 }
+
+/** A username to suggest from someone's name: "Andrew Irorere" → "andrewirorere" (empty if too short). */
+export function suggestUsername(name: string) {
+  const base = name
+    .normalize("NFKD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, "")
+    .slice(0, 30);
+  return base.length >= 3 ? base : "";
+}
