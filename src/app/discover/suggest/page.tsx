@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { PortfolioForm } from "@/components/discover/portfolio-form";
 
-export const metadata: Metadata = { title: "Suggest a portfolio" };
+export const metadata: Metadata = { title: "Suggest a portfolio", robots: { index: false } };
 
 /** Signed-in members only (see the proxy). Suggestions wait for an admin before they're listed. */
 export default function SuggestPortfolioPage() {

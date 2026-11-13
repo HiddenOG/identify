@@ -19,7 +19,11 @@ export async function generateMetadata({ params }: PageProps<"/tags/[tag]">): Pr
   const { tag } = await params;
   const slug = decodeURIComponent(tag).toLowerCase();
   const name = topicName(slug) ?? slug;
-  return { title: `${name} projects`, description: `Tech projects tagged ${name}.` };
+  return {
+    title: `${name} projects`,
+    description: `Projects and stories about ${name} on Identify: real work, written up by the people who built it.`,
+    alternates: { canonical: `/tags/${encodeURIComponent(slug)}` },
+  };
 }
 
 export default function TagPage({ params }: PageProps<"/tags/[tag]">) {

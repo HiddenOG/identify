@@ -8,7 +8,7 @@ import { getCurrentUser } from "@/lib/profiles";
 import { IDENTIFY_USERNAME } from "@/lib/site";
 import { createClient } from "@/lib/supabase/server";
 
-export const metadata: Metadata = { title: "New story" };
+export const metadata: Metadata = { title: "New story", robots: { index: false } };
 
 export default function NewProjectPage({ searchParams }: PageProps<"/new">) {
   return (

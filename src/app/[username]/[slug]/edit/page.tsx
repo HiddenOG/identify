@@ -9,7 +9,7 @@ import { getCurrentUser } from "@/lib/profiles";
 import { getProject } from "@/lib/projects";
 import { createClient } from "@/lib/supabase/server";
 
-export const metadata: Metadata = { title: "Edit story" };
+export const metadata: Metadata = { title: "Edit story", robots: { index: false } };
 
 export default function EditProjectPage({ params }: PageProps<"/[username]/[slug]/edit">) {
   return (

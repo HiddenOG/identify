@@ -1,10 +1,12 @@
 import { Suspense, type ReactNode } from "react";
 import { cacheLife, cacheTag } from "next/cache";
+import type { Metadata } from "next";
 import Link from "next/link";
 import { AuthorAvatar } from "@/components/author-avatar";
 import { ClaimForm } from "@/components/claim-form";
 import { PortfolioBento } from "@/components/discover/portfolio-card";
 import { FeedTabs } from "@/components/feed-tabs";
+import { JsonLd } from "@/components/json-ld";
 import { GetStarted } from "@/components/get-started";
 import { FollowButton } from "@/components/follow-button";
 import { HeroBalloons } from "@/components/hero-balloons";
@@ -18,7 +20,7 @@ import { getFollowingIds } from "@/lib/follows";
 import { getForYou } from "@/lib/for-you";
 import { getCurrentUser, isSignedInMember, PROFILES_TAG, toFullProfile, type FullProfile, type ProfileRow } from "@/lib/profiles";
 import { formatDate, getFeatured, getFeed, getTrending, projectHref, PROJECTS_TAG, topTags, type ProjectWithAuthor } from "@/lib/projects";
-import { FOOTER_LINKS, SITE_TAGLINE } from "@/lib/site";
+import { CONTACT_EMAIL, FOOTER_LINKS, SITE_NAME, SITE_TAGLINE, SITE_URL } from "@/lib/site";
 import { hasSupabaseEnv } from "@/lib/supabase/env";
 import { createPublicClient } from "@/lib/supabase/public";
 import { createClient } from "@/lib/supabase/server";
@@ -60,6 +62,31 @@ async function getCachedTrending() {
   return getTrending(createPublicClient());
 }
 
+/** Who Identify is, and how to search it (Google can show a search box for the site). */
+const SITE_DATA = {
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "Organization",
+      "@id": `${SITE_URL}/#organization`,
+      name: SITE_NAME,
+      url: SITE_URL,
+      logo: `${SITE_URL}/email/logo.png`,
+      email: CONTACT_EMAIL,
+    },
+    {
+      "@type": "WebSite",
+      "@id": `${SITE_URL}/#website`,
+      name: SITE_NAME,
+      url: SITE_URL,
+      publisher: { "@id": `${SITE_URL}/#organization` },
+      potentialAction: { "@type": "SearchAction", target: `${SITE_URL}/search?q={search_term_string}`, "query-input": "required name=search_term_string" },
+    },
+  ],
+};
+
+export const metadata: Metadata = { alternates: { canonical: "/" } };
+
 export default async function Home() {
   const [profiles, pool, trending, picked] = hasSupabaseEnv
     ? await Promise.all([getNewestProfiles(), getCachedFeed(), getCachedTrending(), getCachedFeatured()])
@@ -88,6 +115,7 @@ export default async function Home() {
 
   return (
     <main>
+      <JsonLd data={SITE_DATA} />
       {/* Visitors get the landing hero; signed-in people go straight to the feed. */}
       <Suspense>
         <Landing />

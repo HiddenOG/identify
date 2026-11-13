@@ -20,7 +20,8 @@ import { displayHost } from "@/lib/discover/site";
 import { RemoteImage } from "@/components/remote-image";
 import { isAdmin } from "@/lib/discover/portfolios";
 import { publishProject, setStoryFeatured } from "@/lib/project-actions";
-import { SITE_NAME } from "@/lib/site";
+import { SITE_NAME, SITE_URL } from "@/lib/site";
+import { JsonLd } from "@/components/json-ld";
 import { getCurrentUser } from "@/lib/profiles";
 import { formatDate, getProject, previewMarkdown, readingMinutes } from "@/lib/projects";
 import { getComments, hasLiked } from "@/lib/social";
@@ -38,6 +39,9 @@ export async function generateMetadata({ params }: PageProps<"/[username]/[slug]
     description: project.summary ?? undefined,
     // The card itself (title, author and cover) comes from opengraph-image.tsx next to this page.
     openGraph: { type: "article", url: `/${username}/${slug}` },
+    alternates: { canonical: `/${username}/${slug}` },
+    // Drafts are only visible to their author, but never let one be indexed.
+    ...(project.status !== "published" && { robots: { index: false } }),
   };
 }
 
@@ -85,8 +89,25 @@ async function Project({ params }: Pick<PageProps<"/[username]/[slug]">, "params
     />
   );
 
+  const article = {
+    "@context": "https://schema.org",
+    "@type": "Article",
+    headline: project.title.slice(0, 110),
+    ...(project.summary && { description: project.summary }),
+    ...(project.cover_url && { image: [project.cover_url] }),
+    ...(project.published_at && { datePublished: project.published_at }),
+    dateModified: project.updated_at,
+    author: { "@type": "Person", name: authorName, url: `${SITE_URL}/${project.author.username}` },
+    publisher: { "@type": "Organization", name: SITE_NAME, logo: { "@type": "ImageObject", url: `${SITE_URL}/email/logo.png` } },
+    mainEntityOfPage: `${SITE_URL}/${username}/${slug}`,
+    ...(project.tags.length && { keywords: project.tags.join(", ") }),
+    // A Discover projects story is about someone else's work.
+    ...(subject && { about: { "@type": "Person", name: subject.member?.full_name || subject.name, ...(subject.url && { url: subject.url }) } }),
+  };
+
   return (
     <article>
+      {project.status === "published" && <JsonLd data={article} />}
       {project.status === "draft" && isOwner && (
         // Medium-style draft bar: covers the site header (so no search) and offers Edit and Publish.
         <div className="fixed inset-x-0 top-0 z-50 h-14 border-b border-line bg-background">

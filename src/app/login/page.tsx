@@ -4,7 +4,7 @@ import { SetupNotice } from "@/components/setup-notice";
 import { hasSupabaseEnv } from "@/lib/supabase/env";
 import { AuthForm } from "./auth-form";
 
-export const metadata: Metadata = { title: "Sign in" };
+export const metadata: Metadata = { title: "Sign in", robots: { index: false } };
 
 export default function LoginPage({ searchParams }: PageProps<"/login">) {
   return (

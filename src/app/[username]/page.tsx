@@ -7,10 +7,11 @@ import type { CVProject } from "@/components/cv/types";
 import { FollowButton } from "@/components/follow-button";
 import { MessageButton } from "@/components/message-button";
 import { PrintButton } from "@/components/print-button";
+import { JsonLd } from "@/components/json-ld";
 import { getFollowCounts, isFollowing } from "@/lib/follows";
 import { getCurrentUser, getProfileByUsername } from "@/lib/profiles";
 import { getProjectsByAuthor, projectHref } from "@/lib/projects";
-import { SITE_NAME } from "@/lib/site";
+import { SITE_NAME, SITE_URL } from "@/lib/site";
 import { hasSupabaseEnv } from "@/lib/supabase/env";
 import { createPublicClient } from "@/lib/supabase/public";
 import { createClient } from "@/lib/supabase/server";
@@ -27,6 +28,7 @@ export async function generateMetadata({ params }: PageProps<"/[username]">): Pr
     description: profile.cv.summary.slice(0, 160) || fallback || `${name}'s CV and projects.`,
     // The card itself comes from opengraph-image.tsx next to this page.
     openGraph: { type: "profile", url: `/${profile.view.username}` },
+    alternates: { canonical: `/${profile.view.username}` },
   };
 }
 
@@ -68,8 +70,29 @@ async function Profile({ params }: Pick<PageProps<"/[username]">, "params">) {
       repoUrl: p.repo_url,
     }));
 
+  const current = profile.cv.experience[0];
+  const person = {
+    "@context": "https://schema.org",
+    "@type": "ProfilePage",
+    url: `${SITE_URL}/${profile.view.username}`,
+    mainEntity: {
+      "@type": "Person",
+      name: profile.view.fullName || profile.view.username,
+      alternateName: profile.view.username,
+      url: `${SITE_URL}/${profile.view.username}`,
+      ...(profile.view.headline && { jobTitle: profile.view.headline }),
+      ...(profile.cv.summary && { description: profile.cv.summary.slice(0, 500) }),
+      ...(profile.view.avatarUrl && { image: profile.view.avatarUrl }),
+      ...(profile.view.location && { address: { "@type": "PostalAddress", addressLocality: profile.view.location } }),
+      ...(current?.company && { worksFor: { "@type": "Organization", name: current.company } }),
+      knowsAbout: [...profile.cv.skills, ...profile.cv.tools].slice(0, 20),
+      sameAs: Object.values(profile.cv.links).filter((v): v is string => typeof v === "string" && /^https?:\/\//.test(v)),
+    },
+  };
+
   return (
     <>
+      <JsonLd data={person} />
       {/* Same width and side margins as the header row, so the actions line up under its buttons. */}
       <div className="border-b border-line print:hidden">
         <div className="flex flex-wrap items-center justify-between gap-x-5 gap-y-3 px-4 py-3 text-sm sm:px-6 signed-out:mx-auto signed-out:max-w-6xl">

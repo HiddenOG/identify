@@ -7,7 +7,8 @@ import { hasSupabaseEnv } from "@/lib/supabase/env";
 
 export const metadata: Metadata = {
   title: "Discover",
-  description: "Exceptional people and the work that proves what they can do.",
+  description: "Exceptional people and the work that proves what they can do: hand-picked developer, design and data portfolios.",
+  alternates: { canonical: "/discover" },
 };
 
 export default async function DiscoverPage() {

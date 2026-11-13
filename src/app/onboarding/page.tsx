@@ -9,7 +9,7 @@ import { hasSupabaseEnv } from "@/lib/supabase/env";
 import { createClient } from "@/lib/supabase/server";
 import { OnboardingForm } from "./onboarding-form";
 
-export const metadata: Metadata = { title: "Set up your page" };
+export const metadata: Metadata = { title: "Set up your page", robots: { index: false } };
 
 export default function OnboardingPage({ searchParams }: PageProps<"/onboarding">) {
   return (
