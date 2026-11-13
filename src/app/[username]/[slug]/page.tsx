@@ -78,7 +78,9 @@ async function Project({ params }: Pick<PageProps<"/[username]/[slug]">, "params
   const authorName = project.author.full_name || project.author.username;
   const loginHref = `/login?next=${encodeURIComponent(`/${username}/${slug}`)}`;
   // Like Medium: signed-out readers get the opening, then sign in to read the rest.
-  const { text: body, cut: gated } = userId ? { text: project.body_md, cut: false } : previewMarkdown(project.body_md);
+  // The rest is still sent, hidden, and marked as for signed-in readers (Google's paywall markup), so
+  // search engines can index the whole story while people see the sign-in prompt (as Medium does).
+  const { text: body, cut: gated, rest } = userId ? { text: project.body_md, cut: false, rest: "" } : previewMarkdown(project.body_md);
   const likeButton = (
     <LikeButton
       projectId={project.id}
@@ -103,6 +105,11 @@ async function Project({ params }: Pick<PageProps<"/[username]/[slug]">, "params
     ...(project.tags.length && { keywords: project.tags.join(", ") }),
     // A Discover projects story is about someone else's work.
     ...(subject && { about: { "@type": "Person", name: subject.member?.full_name || subject.name, ...(subject.url && { url: subject.url }) } }),
+    // Tells Google the hidden part is for signed-in readers, not cloaking.
+    ...(gated && {
+      isAccessibleForFree: false,
+      hasPart: { "@type": "WebPageElement", isAccessibleForFree: false, cssSelector: ".story-rest" },
+    }),
   };
 
   return (
@@ -224,6 +231,11 @@ async function Project({ params }: Pick<PageProps<"/[username]/[slug]">, "params
 
       <div className={`mt-10 ${gated ? "relative max-h-[28rem] overflow-hidden" : ""}`}>
         <Markdown>{body}</Markdown>
+        {gated && (
+          <div className="story-rest hidden" aria-hidden>
+            <Markdown>{rest}</Markdown>
+          </div>
+        )}
         {gated && <div className="pointer-events-none absolute inset-x-0 bottom-0 h-40 bg-linear-to-b from-transparent to-background" />}
       </div>
       {gated ? (

@@ -91,9 +91,9 @@ const PREVIEW_CHARS = 700;
 /**
  * The opening of a write-up for signed-out readers, cut at a block boundary (never inside a
  * fenced code block) so the Markdown still renders cleanly. `cut` is false when the whole thing
- * is short enough to show. Done on the server, so the rest never reaches the browser.
+ * is short enough to show. `rest` is everything after the cut (empty when `cut` is false).
  */
-export function previewMarkdown(markdown: string): { text: string; cut: boolean } {
+export function previewMarkdown(markdown: string): { text: string; cut: boolean; rest: string } {
   const blocks: string[] = [];
   let current: string[] = [];
   let inFence = false;
@@ -121,7 +121,7 @@ export function previewMarkdown(markdown: string): { text: string; cut: boolean 
     if (size >= limit) break;
   }
   const cut = kept.length < blocks.length;
-  return { text: kept.join("\n\n"), cut };
+  return { text: kept.join("\n\n"), cut, rest: blocks.slice(kept.length).join("\n\n") };
 }
 
 export function formatDate(iso: string | null) {
