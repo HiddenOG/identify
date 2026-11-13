@@ -59,11 +59,11 @@ export function inviteHtml(d: InviteDetails) {
     `<a href="${esc(href)}" style="display:inline-block;margin:0 8px 8px 0;background:${primary ? "#111827" : "#ffffff"};color:${primary ? "#ffffff" : "#111827"};border:2px solid #111827;text-decoration:none;font-size:16px;font-weight:600;padding:12px 26px;border-radius:999px;font-family:${font};">${esc(text)}</a>`;
   const compliment = d.compliment?.trim() ? esc(d.compliment.trim()) : `<span style="background:#fef08a;">${esc(COMPLIMENT_PLACEHOLDER)}</span>`;
   const f = d.feature;
-  const badge = f ? "&#10022; FEATURED IN IDENTIFY DISCOVERIES" : "&#10022; CHOSEN FOR DISCOVER";
+  const badge = f ? "&#10022; FEATURED IN DISCOVER PROJECTS" : "&#10022; CHOSEN FOR DISCOVER";
   const heading = f ? `${first}, ${SITE_NAME} wrote about your work` : `${first}, ${SITE_NAME} has chosen your portfolio`;
   const intro = f
     ? [
-        p(`${esc(whoWeAre(d.location))} In Discoveries, we find great work on the internet and tell the story behind it.`),
+        p(`${esc(whoWeAre(d.location))} In Discover projects, we find great work on the internet and tell the story behind it.`),
         p(`We found you through ${link(`https://${d.host}`, d.host)}. ${compliment} So we wrote about it: ${link(f.url, f.title)}. It credits you and links straight to your site.`),
         p(`You&rsquo;re also listed under ${link(d.categoryUrl, d.categoryLabel)}, and that listing is yours to claim, for free. Claiming it turns it into your own ${SITE_NAME} profile: a CV website at <strong>${esc(new URL(SITE_URL).host)}/yourname</strong>, the feature linked to it, and a place to write up your own projects.`),
       ].join("\n    ")
@@ -103,7 +103,7 @@ export function inviteText(d: InviteDetails) {
     return [
       `${firstName(d.name)}, ${SITE_NAME} wrote about your work.`,
       "",
-      `${whoWeAre(d.location)} In Discoveries, we find great work on the internet and tell the story behind it.`,
+      `${whoWeAre(d.location)} In Discover projects, we find great work on the internet and tell the story behind it.`,
       "",
       `We found you through ${d.host}. ${compliment} So we wrote about it: ${f.title}, ${f.url}. It credits you and links straight to your site.`,
       "",

@@ -15,7 +15,7 @@ export function ProjectCard({ project }: { project: ProjectWithAuthor }) {
       <Link href={`/${project.author.username}`} className="mb-3 flex w-max max-w-full items-center gap-2 text-[13px] hover:underline">
         <AuthorAvatar name={authorName} url={project.author.avatar_url} size={20} />
         <span className="truncate">{authorName}</span>
-        {project.feature_section && <span className="shrink-0 text-muted">in Discoveries</span>}
+        {project.feature_section && <span className="shrink-0 text-muted">in Discover projects</span>}
       </Link>
 
       <div className="flex gap-6 sm:gap-12">

@@ -229,7 +229,7 @@ export function FeaturePanel({
       {/* 2. Discoveries section, 3. Featured: each on its own. */}
       <div className="mt-4 grid gap-3 sm:grid-cols-2">
         <label className="block">
-          <span className="mb-1 block text-sm font-medium">Discoveries section (optional)</span>
+          <span className="mb-1 block text-sm font-medium">Discover projects section (optional)</span>
           <select
             name="feature_section"
             value={section}
@@ -254,7 +254,7 @@ export function FeaturePanel({
           </label>
           <label className={`flex items-center gap-2 ${section ? "" : "opacity-50"}`}>
             <input type="checkbox" name="editors_pick" defaultChecked={project?.editors_pick} disabled={!section} />
-            Editor&apos;s pick (leads Discoveries and the home page)
+            Editor&apos;s pick (leads Discover projects and the home page)
           </label>
         </div>
       </div>

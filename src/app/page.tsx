@@ -207,7 +207,7 @@ async function DiscoverStrip() {
       {pick && (
         <section className="mb-12">
           <div className="mb-4 flex items-baseline justify-between gap-4">
-            <h2 className="text-xl font-bold">{pick.editors_pick ? "Editor’s pick" : "From Discoveries"}</h2>
+            <h2 className="text-xl font-bold">{pick.editors_pick ? "Editor’s pick" : "From Discover projects"}</h2>
             <Link href="/discover/features" className="shrink-0 text-sm font-medium text-success hover:underline">
               More stories
             </Link>

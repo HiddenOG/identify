@@ -299,7 +299,7 @@ export function ProjectEditor({
           placeholder="python, fastapi, rag"
           className={input}
         />
-        <span className="mt-1 block text-xs text-muted">Comma separated, up to 8.</span>
+        <span className="mt-1 block text-xs text-muted">Comma separated, up to 8. Leave it empty and we&apos;ll tag it from what you wrote.</span>
       </label>
 
       <div>

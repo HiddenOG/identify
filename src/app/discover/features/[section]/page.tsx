@@ -11,7 +11,7 @@ export async function generateMetadata({ params }: PageProps<"/discover/features
   const { section } = await params;
   if (!isFeatureSection(section)) return {};
   const info = sectionInfo(section);
-  return { title: `${info.label} · Discoveries`, description: info.blurb };
+  return { title: `${info.label} · Discover projects`, description: info.blurb };
 }
 
 export default async function DiscoveriesSectionPage({ params }: PageProps<"/discover/features/[section]">) {

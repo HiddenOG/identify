@@ -1,10 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { FeatureCard, FeatureHero } from "@/components/discover/feature-card";
-import { PortfolioBento } from "@/components/discover/portfolio-card";
 import { PortfolioDirectory } from "@/components/discover/portfolio-directory";
 import { SetupNotice } from "@/components/setup-notice";
-import { getCachedFeatures, getCachedPortfolios } from "@/lib/discover/cached";
+import { getCachedPortfolios } from "@/lib/discover/cached";
 import { hasSupabaseEnv } from "@/lib/supabase/env";
 
 export const metadata: Metadata = {
@@ -22,15 +20,13 @@ export default async function DiscoverPage() {
   }
 
   // Only what an admin lists appears here; new sign-ups are never added automatically.
-  const [portfolios, features] = await Promise.all([getCachedPortfolios(), getCachedFeatures(undefined, 4)]);
-  const [lead, ...moreFeatures] = features;
-  const featured = portfolios.slice(0, 3);
+  const portfolios = await getCachedPortfolios();
   // Newest first, so every listing can be found by scrolling.
   const latest = portfolios.toSorted((a, b) => (b.listed_at ?? b.created_at).localeCompare(a.listed_at ?? a.created_at));
 
   return (
     <main className="mx-auto max-w-6xl px-4 py-10 sm:px-6">
-      <div className="mb-10 flex flex-wrap items-end justify-between gap-4">
+      <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 className="font-serif text-4xl font-bold sm:text-5xl">Discover</h1>
           <p className="mt-2 text-lg text-muted">Exceptional people, and the work that proves what they can do.</p>
@@ -40,25 +36,7 @@ export default async function DiscoverPage() {
         </Link>
       </div>
 
-      {lead && (
-        <section className="mb-14">
-          <div className="mb-4 flex items-baseline justify-between gap-4">
-            <h2 className="text-xl font-bold">Discoveries</h2>
-            <Link href="/discover/features" className="shrink-0 text-sm font-medium text-success hover:underline">
-              All stories
-            </Link>
-          </div>
-          <FeatureHero feature={lead} priority />
-          {moreFeatures.length > 0 && (
-            <div className="mt-10 grid gap-x-6 gap-y-10 sm:grid-cols-2 lg:grid-cols-3">
-              {moreFeatures.map((f) => (
-                <FeatureCard key={f.id} feature={f} />
-              ))}
-            </div>
-          )}
-        </section>
-      )}
-
+      {/* Tabs (All, Featured, the categories, Discover projects) come straight under the heading. */}
       {portfolios.length === 0 ? (
         <p className="py-10 text-muted">
           Nothing here yet.{" "}
@@ -68,17 +46,7 @@ export default async function DiscoverPage() {
           you think deserves to be seen.
         </p>
       ) : (
-        <>
-          <section className="mb-14">
-            <h2 className="mb-4 text-xl font-bold">Featured</h2>
-            <PortfolioBento portfolios={featured} priority={!lead} />
-          </section>
-
-          <section>
-            <h2 className="mb-4 text-xl font-bold">All portfolios</h2>
-            <PortfolioDirectory portfolios={latest} />
-          </section>
-        </>
+        <PortfolioDirectory portfolios={latest} />
       )}
     </main>
   );

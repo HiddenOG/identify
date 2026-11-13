@@ -1,12 +1,14 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
-import { PortfolioCard } from "@/components/discover/portfolio-card";
+import { DirectoryTabs, useDirectoryView } from "@/components/discover/directory-tabs";
+import { PortfolioCard, PortfolioHero } from "@/components/discover/portfolio-card";
 import type { Portfolio } from "@/lib/discover/portfolios";
 import { displayHost } from "@/lib/discover/host";
 
 const TABS = [
+  { id: "featured", label: "Featured" },
   { id: "all", label: "All" },
   { id: "developer", label: "Developers" },
   { id: "design", label: "Design" },
@@ -15,9 +17,7 @@ const TABS = [
 ] as const;
 
 type Tab = (typeof TABS)[number]["id"];
-type View = "list" | "grid";
 
-const VIEW_KEY = "identify-discover-view";
 const PAGE = 60;
 
 function shortDate(iso: string) {
@@ -25,92 +25,47 @@ function shortDate(iso: string) {
 }
 
 /**
- * Discover's directory: category tabs along the top and a compact list or a grid of preview cards.
+ * Discover's directory: Featured first (the newest featured portfolio large), All and the categories; a grid of preview cards by default, or a compact list.
  * Searching is the site-wide search in the header, which includes Discover.
  */
 export function PortfolioDirectory({ portfolios }: { portfolios: Portfolio[] }) {
-  const [tab, setTab] = useState<Tab>("all");
-  const [view, setView] = useState<View>("list");
+  const [tab, setTab] = useState<Tab>("featured");
+  const [view, setView] = useDirectoryView("identify-discover-people-view");
   const [shown, setShown] = useState(PAGE);
 
-  // Remember the list/grid choice on this device (a convenience; storage may be blocked).
-  useEffect(() => {
-    try {
-      const saved = localStorage.getItem(VIEW_KEY);
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- reading the saved choice once after mount
-      if (saved === "grid" || saved === "list") setView(saved);
-    } catch {}
-  }, []);
-  function chooseView(next: View) {
-    setView(next);
-    try {
-      localStorage.setItem(VIEW_KEY, next);
-    } catch {}
-  }
-
-  const results = useMemo(() => portfolios.filter((p) => tab === "all" || p.category === tab), [portfolios, tab]);
-  const visible = results.slice(0, shown);
+  const results = useMemo(
+    () => portfolios.filter((p) => tab === "all" || (tab === "featured" ? p.featured : p.category === tab)),
+    [portfolios, tab],
+  );
+  // On Featured, the newest one leads, large.
+  const lead = tab === "featured" ? results[0] : undefined;
+  const others = lead ? results.slice(1) : results;
+  const visible = others.slice(0, shown);
 
   return (
     <section>
-      <div className="flex gap-2">
-        {/* Categories, left to right. Scrolls sideways on phones. */}
-        <div className="flex min-w-0 flex-1 gap-1 overflow-x-auto rounded-xl bg-surface p-1" role="tablist" aria-label="Categories">
-          {TABS.map((t) => (
-            <button
-              key={t.id}
-              type="button"
-              role="tab"
-              aria-selected={tab === t.id}
-              onClick={() => {
-                setTab(t.id);
-                setShown(PAGE);
-              }}
-              className={`flex-1 shrink-0 rounded-lg px-4 py-2 text-sm whitespace-nowrap ${
-                tab === t.id ? "bg-background font-medium text-foreground shadow-sm" : "text-muted hover:text-foreground"
-              }`}
-            >
-              {t.label}
-            </button>
-          ))}
-        </div>
-        <div className="flex shrink-0 gap-1 rounded-xl bg-surface p-1" role="group" aria-label="View">
-          {(["list", "grid"] as const).map((v) => (
-            <button
-              key={v}
-              type="button"
-              onClick={() => chooseView(v)}
-              aria-pressed={view === v}
-              aria-label={v === "list" ? "List view" : "Grid view"}
-              className={`grid size-9 place-items-center rounded-lg ${view === v ? "bg-background shadow-sm" : "text-muted hover:text-foreground"}`}
-            >
-              {v === "list" ? (
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
-                  <path d="M5 7h14M5 12h14M5 17h14" />
-                </svg>
-              ) : (
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
-                  <rect x="4" y="4" width="7" height="7" rx="1.5" />
-                  <rect x="13" y="4" width="7" height="7" rx="1.5" />
-                  <rect x="4" y="13" width="7" height="7" rx="1.5" />
-                  <rect x="13" y="13" width="7" height="7" rx="1.5" />
-                </svg>
-              )}
-            </button>
-          ))}
-        </div>
-      </div>
+      <DirectoryTabs
+        label="Categories"
+        tabs={TABS}
+        active={tab}
+        onSelect={(id) => {
+          setTab(id);
+          setShown(PAGE);
+        }}
+        view={view}
+        onView={setView}
+      />
 
       {results.length === 0 ? (
         <p className="py-12 text-center text-muted">
-          Nothing in this category yet.{" "}
+          {tab === "featured" ? "Nothing featured yet." : "Nothing in this category yet."}{" "}
           <Link href="/discover/suggest" className="text-foreground underline">
             Suggest one
           </Link>
         </p>
       ) : view === "list" ? (
         <ul className="mt-6 divide-y divide-line">
-          {visible.map((p) => {
+          {(lead ? [lead, ...visible] : visible).map((p) => {
             const member = p.status === "claimed" ? p.member?.username : null;
             return (
               <li key={p.id} className="flex items-baseline gap-3 py-3">
@@ -131,17 +86,26 @@ export function PortfolioDirectory({ portfolios }: { portfolios: Portfolio[] }) 
           })}
         </ul>
       ) : (
-        <div className="mt-6 grid gap-x-6 gap-y-10 sm:grid-cols-2 lg:grid-cols-3">
-          {visible.map((p) => (
-            <PortfolioCard key={p.id} portfolio={p} />
-          ))}
-        </div>
+        <>
+          {lead && (
+            <div className="mt-6">
+              <PortfolioHero portfolio={lead} priority />
+            </div>
+          )}
+          {visible.length > 0 && (
+            <div className="mt-10 grid gap-x-6 gap-y-10 sm:grid-cols-2 lg:grid-cols-3">
+              {visible.map((p) => (
+                <PortfolioCard key={p.id} portfolio={p} />
+              ))}
+            </div>
+          )}
+        </>
       )}
 
-      {shown < results.length && (
+      {shown < others.length && (
         <div className="mt-8 text-center">
           <button type="button" onClick={() => setShown((n) => n + PAGE)} className="rounded-full border border-foreground px-6 py-2 text-sm hover:bg-surface">
-            Show more ({results.length - shown})
+            Show more ({others.length - shown})
           </button>
         </div>
       )}

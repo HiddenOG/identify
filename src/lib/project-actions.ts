@@ -3,6 +3,7 @@
 import { refresh, updateTag } from "next/cache";
 import { after } from "next/server";
 import { redirect } from "next/navigation";
+import { autoTags } from "@/lib/auto-tags";
 import { listForFeature } from "@/lib/discover/actions";
 import { fetchImage, readSitePreview, SiteError } from "@/lib/discover/site";
 import { isAdmin, PORTFOLIOS_TAG } from "@/lib/discover/portfolios";
@@ -126,6 +127,8 @@ export async function saveProject(_: SaveProjectState, formData: FormData): Prom
   const { cover_url, demo_url, repo_url, ...rest } = parsed.data;
   const fields = {
     ...rest,
+    // Left empty: tag it from what it says (topic matching, no AI). Typed tags are kept as they are.
+    tags: rest.tags.length ? rest.tags : autoTags({ title: rest.title, summary: rest.summary, body: rest.body_md }),
     cover_url: cover_url || null,
     demo_url: demo_url || null,
     repo_url: repo_url || null,

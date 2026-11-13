@@ -109,7 +109,7 @@ async function Project({ params }: Pick<PageProps<"/[username]/[slug]">, "params
       {project.feature_section && (
         <p className="mb-4 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs font-semibold tracking-[0.12em] uppercase">
           <Link href="/discover/features" className="hover:underline">
-            {SITE_NAME} Discoveries
+            Discover projects
           </Link>
           <span className="text-muted">·</span>
           <Link href={`/discover/features/${sectionInfo(project.feature_section).id}`} className="text-muted hover:text-foreground">
